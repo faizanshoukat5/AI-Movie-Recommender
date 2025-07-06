@@ -56,10 +56,23 @@ class ProductionRatingDatabase:
     
     def init_database(self):
         """Initialize database tables"""
-        if self.use_postgresql:
-            self._init_postgresql()
-        else:
-            self._init_sqlite()
+        try:
+            logger.info(f"Initializing {self.db_type} database...")
+            
+            # Run migration first
+            self._migrate_database()
+            
+            if self.use_postgresql:
+                self._init_postgresql()
+            else:
+                self._init_sqlite()
+                
+            logger.info("Database initialization completed successfully")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Database initialization failed: {e}")
+            return False
     
     def _init_sqlite(self):
         """Initialize SQLite database"""
@@ -115,7 +128,20 @@ class ProductionRatingDatabase:
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_user_ratings_user_id ON user_ratings(user_id)")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_user_ratings_movie_id ON user_ratings(movie_id)")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_user_watchlist_user_id ON user_watchlist(user_id)")
-            cursor.execute("CREATE INDEX IF NOT EXISTS idx_movie_metadata_tmdb_id ON movie_metadata(tmdb_id)")
+            
+            # Check if tmdb_id column exists before creating index
+            try:
+                cursor.execute("PRAGMA table_info(movie_metadata)")
+                columns = [column[1] for column in cursor.fetchall()]
+                if 'tmdb_id' in columns:
+                    cursor.execute("CREATE INDEX IF NOT EXISTS idx_movie_metadata_tmdb_id ON movie_metadata(tmdb_id)")
+                else:
+                    logger.warning("Column 'tmdb_id' not found in movie_metadata table, skipping index creation")
+            except Exception as e:
+                logger.warning(f"Error checking movie_metadata columns: {e}")
+            
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_movie_metadata_title ON movie_metadata(title)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_movie_metadata_movie_id ON movie_metadata(movie_id)")
             
             conn.commit()
             logger.info("SQLite database initialized")
@@ -178,6 +204,54 @@ class ProductionRatingDatabase:
             
             conn.commit()
             logger.info("PostgreSQL database initialized")
+    
+    def _migrate_database(self):
+        """Migrate database schema to latest version"""
+        try:
+            if self.db_type == 'sqlite':
+                with sqlite3.connect(self.db_path) as conn:
+                    cursor = conn.cursor()
+                    
+                    # Check if movie_metadata table exists
+                    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='movie_metadata'")
+                    if cursor.fetchone():
+                        # Check existing columns
+                        cursor.execute("PRAGMA table_info(movie_metadata)")
+                        existing_columns = [column[1] for column in cursor.fetchall()]
+                        
+                        # Add missing columns
+                        required_columns = {
+                            'tmdb_id': 'INTEGER',
+                            'title': 'TEXT',
+                            'poster_path': 'TEXT',
+                            'backdrop_path': 'TEXT',
+                            'overview': 'TEXT',
+                            'release_date': 'TEXT',
+                            'runtime': 'INTEGER',
+                            'vote_average': 'REAL',
+                            'vote_count': 'INTEGER',
+                            'genres': 'TEXT',
+                            'cast': 'TEXT',
+                            'director': 'TEXT',
+                            'trailer_key': 'TEXT',
+                            'last_updated': 'DATETIME DEFAULT CURRENT_TIMESTAMP'
+                        }
+                        
+                        for column, column_type in required_columns.items():
+                            if column not in existing_columns:
+                                try:
+                                    cursor.execute(f"ALTER TABLE movie_metadata ADD COLUMN {column} {column_type}")
+                                    logger.info(f"Added column '{column}' to movie_metadata table")
+                                except Exception as e:
+                                    logger.warning(f"Could not add column '{column}': {e}")
+                        
+                        conn.commit()
+                        logger.info("Database migration completed")
+                    else:
+                        logger.info("movie_metadata table doesn't exist, will be created during initialization")
+                        
+        except Exception as e:
+            logger.error(f"Database migration failed: {e}")
     
     def add_rating(self, user_id: str, movie_id: int, rating: float, review: str = '') -> bool:
         """Add or update a user rating"""
@@ -520,5 +594,9 @@ class ProductionRatingDatabase:
             logger.error(f"Error getting stats: {e}")
             return {}
 
-# Create instance
-production_rating_db = ProductionRatingDatabase()
+# Create instance only when needed
+def get_production_rating_db():
+    """Get or create ProductionRatingDatabase instance"""
+    if not hasattr(get_production_rating_db, '_instance'):
+        get_production_rating_db._instance = ProductionRatingDatabase()
+    return get_production_rating_db._instance

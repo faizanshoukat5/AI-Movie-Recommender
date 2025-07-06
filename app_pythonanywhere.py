@@ -40,7 +40,7 @@ except ImportError:
     print("Warning: TMDB client not available. Movie posters will not work.")
 
 try:
-    from production_rating_db import ProductionRatingDatabase
+    from production_rating_db import get_production_rating_db
     PRODUCTION_DB_AVAILABLE = True
 except ImportError:
     PRODUCTION_DB_AVAILABLE = False
@@ -92,7 +92,10 @@ logger = logging.getLogger(__name__)
 # Initialize clients
 tmdb_client = TMDBClient() if TMDB_AVAILABLE else None
 if PRODUCTION_DB_AVAILABLE:
-    rating_db = ProductionRatingDatabase()
+    rating_db = get_production_rating_db()
+    # Initialize database safely
+    if hasattr(rating_db, 'init_database'):
+        rating_db.init_database()
 elif RATING_DB_AVAILABLE:
     rating_db = RatingDatabase()
 else:
