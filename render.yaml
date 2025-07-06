@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: ai-movie-backend
+    env: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: python app.py
+    envVars:
+      - key: FLASK_ENV
+        value: production
+      - key: TMDB_API_KEY
+        value: 89cf1a0e526c7c36bafe8d77248d276d
+      - key: PORT
+        value: 10000
