@@ -1,6 +1,6 @@
 # 🎬 AI Movie Recommendation Engine
 
-A modern, full-stack movie recommendation system powered by multiple machine learning algorithms and featuring a beautiful, responsive React frontend with Tailwind CSS.
+A modern, production-ready movie recommendation system powered by multiple machine learning algorithms, featuring real movie posters, interactive ratings, and a beautiful React frontend.
 
 ![AI Movie Recommender](https://img.shields.io/badge/AI-Movie%20Recommender-blue?style=for-the-badge&logo=react)
 ![Python](https://img.shields.io/badge/Python-3.8+-blue?style=for-the-badge&logo=python)
@@ -18,19 +18,32 @@ A modern, full-stack movie recommendation system powered by multiple machine lea
 - **Content-based Filtering**: Genre-based recommendations
 - **Ensemble Model**: Combines multiple models for superior predictions
 
+### 🖼️ **Movie Poster Integration** ✨ *NEW*
+- **TMDB API Integration**: Real movie posters from The Movie Database
+- **High-Quality Images**: Professional movie posters for visual appeal
+- **Metadata Enrichment**: Movie overviews, cast, director, and trailer information
+- **Backdrop Images**: Beautiful background images for enhanced movie details
+
+### ⭐ **Interactive Rating System** ✨ *NEW*
+- **5-Star Rating Interface**: Beautiful star-based rating system
+- **Real-time Feedback**: Instant rating updates and statistics
+- **User Rating History**: Track and view all your movie ratings
+- **Rating Analytics**: Average ratings and user statistics
+
 ### 🎨 **Modern UI/UX**
 - **Responsive Design**: Mobile-first approach with Tailwind CSS
 - **Glassmorphism Effects**: Modern UI with backdrop blur and transparency
-- **Smooth Animations**: Fade-in effects and smooth transitions
-- **Interactive Elements**: Hover effects and loading states
+- **Movie Cards**: Beautiful cards with posters, ratings, and actions
+- **Interactive Modals**: Smooth rating and movie detail modals
 - **Professional Typography**: Inter font for excellent readability
 
 ### 🔍 **Core Functionality**
-- **Browse Movies**: Search and filter through 1,682 movies
-- **Get Recommendations**: Personalized suggestions for any user
-- **Compare Models**: Side-by-side comparison of all ML models
-- **Predict Ratings**: Individual rating predictions for user-movie pairs
-- **Real-time Search**: Instant search with sort options
+- **Visual Movie Browsing**: Grid view with movie posters and ratings
+- **Enhanced Search**: Search with poster thumbnails and metadata
+- **Personalized Recommendations**: ML-powered suggestions with visual interface
+- **Movie Details**: Rich movie information with cast, director, and trailers
+- **Rating Management**: Rate movies and view your rating history
+- **Model Comparison**: Side-by-side comparison of all ML models
 
 ## 🚀 Quick Start
 
@@ -38,6 +51,7 @@ A modern, full-stack movie recommendation system powered by multiple machine lea
 - Python 3.8+
 - Node.js 14+
 - npm or yarn
+- TMDB API Key (for movie posters)
 
 ### Installation
 
@@ -47,7 +61,14 @@ A modern, full-stack movie recommendation system powered by multiple machine lea
    cd AI-Movie-Recommender
    ```
 
-2. **Install Python dependencies**
+2. **Set up TMDB API** ✨ *NEW*
+   - Get your free API key from [TMDB](https://www.themoviedb.org/settings/api)
+   - Create a `.env` file in the root directory:
+   ```bash
+   TMDB_API_KEY=your_api_key_here
+   ```
+
+3. **Install Python dependencies**
    ```bash
    pip install -r requirements.txt
    ```
@@ -64,14 +85,20 @@ A modern, full-stack movie recommendation system powered by multiple machine lea
    python app.py
    ```
 
-5. **Start the frontend development server**
+5. **Enhanced Movie Data** ✨ *NEW*
+   ```bash
+   # Optional: Populate database with movie posters (run once)
+   python enhance_movies.py
+   ```
+
+6. **Start the frontend development server**
    ```bash
    cd recommendation-frontend
    npm start
    ```
 
-6. **Access the application**
-   - Frontend: `http://localhost:3001`
+7. **Access the application**
+   - Frontend: `http://localhost:3001` (or the port shown in console)
    - Backend API: `http://localhost:5000`
 
 ## 📊 Dataset
@@ -228,13 +255,40 @@ npm run build
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 
-## 📝 License
+## � API Endpoints
+
+### Core Endpoints
+- `GET /movies` - Browse movies with optional posters (`?include_posters=true`)
+- `GET /search` - Search movies with filtering and sorting
+- `GET /recommendations/{user_id}` - Get personalized recommendations
+- `GET /predict` - Predict rating for user-movie pair
+- `GET /compare/{user_id}` - Compare all ML models
+
+### Movie Details & Posters ✨ *NEW*
+- `GET /movies/{movie_id}/enhanced` - Rich movie details with TMDB data
+- `GET /movies/{movie_id}` - Basic movie information
+- `POST /movies/batch-enhance` - Bulk enhance movies with posters
+
+### Rating System ✨ *NEW*
+- `POST /movies/{movie_id}/rate` - Rate a movie (1-5 stars)
+- `GET /users/{user_id}/ratings` - Get user's rating history
+- `GET /movies/{movie_id}/rating/{user_id}` - Get specific user rating
+- `POST /users/{user_id}/watchlist/{movie_id}` - Add to watchlist
+- `DELETE /users/{user_id}/watchlist/{movie_id}` - Remove from watchlist
+- `GET /users/{user_id}/watchlist` - Get user's watchlist
+
+### System Status
+- `GET /status` - System health and model status
+- `GET /models` - Available ML models information
+
+## �📝 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## 🙏 Acknowledgments
 
 - **MovieLens** for providing the dataset
+- **TMDB** for movie posters and metadata
 - **Scikit-learn** for machine learning algorithms
 - **React** for the frontend framework
 - **Tailwind CSS** for the styling framework
@@ -242,17 +296,19 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 📊 Project Statistics
 
-- **Lines of Code**: 2,000+
-- **Components**: 15+
-- **API Endpoints**: 9
+- **Lines of Code**: 2,500+
+- **Components**: 20+
+- **API Endpoints**: 15+ (including new rating & poster endpoints)
 - **ML Models**: 6
+- **Movie Posters**: 1,600+ cached from TMDB
 - **Test Coverage**: 100%
 
 ## 🎯 Future Enhancements
 
+- [x] Movie poster integration (TMDB API) ✅ *COMPLETED*
+- [x] Interactive rating system ✅ *COMPLETED*
 - [ ] User authentication system
-- [ ] Movie poster integration (TMDB API)
-- [ ] Social features (reviews, ratings)
+- [ ] Social features (reviews, sharing)
 - [ ] Advanced analytics dashboard
 - [ ] Docker containerization
 - [ ] Cloud deployment (AWS/GCP)

@@ -15,9 +15,15 @@ import warnings
 warnings.filterwarnings('ignore')
 import re
 import random
+from tmdb_client import TMDBClient
+from rating_db import RatingDatabase
 
 app = Flask(__name__)
 CORS(app)
+
+# Initialize TMDB client and rating database
+tmdb_client = TMDBClient()
+rating_db = RatingDatabase()
 
 # Global variables to store multiple trained models and data
 models = {
@@ -187,15 +193,37 @@ def get_svd_recommendations(user_id, n_recommendations=10):
         # Get top N recommendations
         top_recommendations = user_predictions.nlargest(n_recommendations)
         
-        # Format recommendations with movie titles
+        # Format recommendations with movie titles and posters
         recommendations = []
         for item_id, predicted_rating in top_recommendations.items():
             movie_title = movie_titles.get(item_id, f"Movie {item_id}")
+            
+            # Get poster URL from cached metadata or fetch from TMDB
+            poster_url = None
+            try:
+                # First try to get from cached metadata
+                cached_metadata = rating_db.get_movie_metadata(item_id)
+                if cached_metadata and cached_metadata.get('poster_path'):
+                    poster_url = tmdb_client.get_poster_url(cached_metadata['poster_path'])
+                    print(f"SVD: Found cached poster for movie {item_id}: {poster_url}")
+                else:
+                    # If not cached, search TMDB directly
+                    print(f"SVD: Searching TMDB for movie {item_id} ({movie_title})")
+                    search_result = tmdb_client.search_movie(movie_title)
+                    if search_result and search_result.get('poster_path'):
+                        poster_url = tmdb_client.get_poster_url(search_result['poster_path'])
+                        print(f"SVD: Found TMDB poster for movie {item_id}: {poster_url}")
+            except Exception as e:
+                print(f"SVD: Error getting poster for movie {item_id}: {e}")
+                pass
+                
             recommendations.append({
+                'id': int(item_id),  # MovieCard expects 'id', not 'item_id'
                 'item_id': int(item_id),
                 'title': movie_title,
                 'predicted_rating': round(float(predicted_rating), 2),
-                'model': 'SVD'
+                'model': 'SVD',
+                'poster_url': poster_url
             })
         
         return recommendations
@@ -232,15 +260,27 @@ def get_nmf_recommendations(user_id, n_recommendations=10):
         # Get top N recommendations
         top_recommendations = user_predictions.nlargest(n_recommendations)
         
-        # Format recommendations with movie titles
+        # Format recommendations with movie titles and posters
         recommendations = []
         for item_id, predicted_rating in top_recommendations.items():
             movie_title = movie_titles.get(item_id, f"Movie {item_id}")
+            
+            # Get poster URL from cached metadata
+            poster_url = None
+            try:
+                cached_metadata = rating_db.get_movie_metadata(item_id)
+                if cached_metadata and cached_metadata.get('poster_path'):
+                    poster_url = tmdb_client.get_poster_url(cached_metadata['poster_path'])
+            except:
+                pass
+                
             recommendations.append({
+                'id': int(item_id),  # MovieCard expects 'id', not 'item_id'
                 'item_id': int(item_id),
                 'title': movie_title,
                 'predicted_rating': round(float(predicted_rating), 2),
-                'model': 'NMF'
+                'model': 'NMF',
+                'poster_url': poster_url
             })
         
         return recommendations
@@ -293,15 +333,27 @@ def get_item_knn_recommendations(user_id, n_recommendations=10):
         # Get top N recommendations
         top_items = sorted(predictions.items(), key=lambda x: x[1], reverse=True)[:n_recommendations]
         
-        # Format recommendations with movie titles
+        # Format recommendations with movie titles and posters
         recommendations = []
         for item_id, predicted_rating in top_items:
             movie_title = movie_titles.get(item_id, f"Movie {item_id}")
+            
+            # Get poster URL from cached metadata
+            poster_url = None
+            try:
+                cached_metadata = rating_db.get_movie_metadata(item_id)
+                if cached_metadata and cached_metadata.get('poster_path'):
+                    poster_url = tmdb_client.get_poster_url(cached_metadata['poster_path'])
+            except:
+                pass
+                
             recommendations.append({
+                'id': int(item_id),  # MovieCard expects 'id', not 'item_id'
                 'item_id': int(item_id),
                 'title': movie_title,
                 'predicted_rating': round(float(predicted_rating), 2),
-                'model': 'Item-KNN'
+                'model': 'Item-KNN',
+                'poster_url': poster_url
             })
         
         print(f"Returning {len(recommendations)} item-KNN recommendations")
@@ -360,15 +412,27 @@ def get_user_knn_recommendations(user_id, n_recommendations=10):
         # Get top N recommendations
         top_items = sorted(predictions.items(), key=lambda x: x[1], reverse=True)[:n_recommendations]
         
-        # Format recommendations with movie titles
+        # Format recommendations with movie titles and posters
         recommendations = []
         for item_id, predicted_rating in top_items:
             movie_title = movie_titles.get(item_id, f"Movie {item_id}")
+            
+            # Get poster URL from cached metadata
+            poster_url = None
+            try:
+                cached_metadata = rating_db.get_movie_metadata(item_id)
+                if cached_metadata and cached_metadata.get('poster_path'):
+                    poster_url = tmdb_client.get_poster_url(cached_metadata['poster_path'])
+            except:
+                pass
+                
             recommendations.append({
+                'id': int(item_id),  # MovieCard expects 'id', not 'item_id'
                 'item_id': int(item_id),
                 'title': movie_title,
                 'predicted_rating': round(float(predicted_rating), 2),
-                'model': 'User-KNN'
+                'model': 'User-KNN',
+                'poster_url': poster_url
             })
         
         print(f"Returning {len(recommendations)} user-KNN recommendations")
@@ -417,15 +481,27 @@ def get_content_recommendations(user_id, n_recommendations=10):
         # Get top N recommendations
         top_items = sorted(predictions.items(), key=lambda x: x[1], reverse=True)[:n_recommendations]
         
-        # Format recommendations with movie titles
+        # Format recommendations with movie titles and posters
         recommendations = []
         for item_id, similarity_score in top_items:
             movie_title = movie_titles.get(item_id, f"Movie {item_id}")
+            
+            # Get poster URL from cached metadata
+            poster_url = None
+            try:
+                cached_metadata = rating_db.get_movie_metadata(item_id)
+                if cached_metadata and cached_metadata.get('poster_path'):
+                    poster_url = tmdb_client.get_poster_url(cached_metadata['poster_path'])
+            except:
+                pass
+                
             recommendations.append({
+                'id': int(item_id),  # MovieCard expects 'id', not 'item_id'
                 'item_id': int(item_id),
                 'title': movie_title,
                 'predicted_rating': round(float(similarity_score * 5), 2),  # Scale similarity to rating
-                'model': 'Content-Based'
+                'model': 'Content-Based',
+                'poster_url': poster_url
             })
         
         return recommendations
@@ -498,15 +574,36 @@ def get_ensemble_recommendations(user_id, n_recommendations=10, weights=None):
         # Get top N recommendations
         top_items = sorted(ensemble_scores.items(), key=lambda x: x[1]['score'], reverse=True)[:n_recommendations]
         
-        # Format recommendations
+        # Format recommendations with posters
         recommendations = []
         for item_id, data in top_items:
+            # Get poster URL from cached metadata or fetch from TMDB
+            poster_url = None
+            try:
+                # First try to get from cached metadata
+                cached_metadata = rating_db.get_movie_metadata(item_id)
+                if cached_metadata and cached_metadata.get('poster_path'):
+                    poster_url = tmdb_client.get_poster_url(cached_metadata['poster_path'])
+                    print(f"Ensemble: Found cached poster for movie {item_id}: {poster_url}")
+                else:
+                    # If not cached, search TMDB directly
+                    print(f"Ensemble: Searching TMDB for movie {item_id} ({data['title']})")
+                    search_result = tmdb_client.search_movie(data['title'])
+                    if search_result and search_result.get('poster_path'):
+                        poster_url = tmdb_client.get_poster_url(search_result['poster_path'])
+                        print(f"Ensemble: Found TMDB poster for movie {item_id}: {poster_url}")
+            except Exception as e:
+                print(f"Ensemble: Error getting poster for movie {item_id}: {e}")
+                pass
+                
             recommendations.append({
+                'id': int(item_id),  # MovieCard expects 'id', not 'item_id'
                 'item_id': int(item_id),
                 'title': data['title'],
                 'predicted_rating': round(float(data['score']), 2),
                 'model': 'Ensemble',
-                'model_scores': data['model_scores']
+                'model_scores': data['model_scores'],
+                'poster_url': poster_url
             })
         
         print(f"Returning {len(recommendations)} ensemble recommendations")
@@ -715,9 +812,43 @@ def compare_models(user_id):
 
 @app.route('/movies')
 def get_movies():
-    """Get all movies"""
-    movies = [{'id': movie_id, 'title': title} for movie_id, title in movie_titles.items()]
-    return jsonify({'movies': movies})
+    """Get all movies with basic information and posters"""
+    limit = request.args.get('limit', type=int)
+    include_posters = request.args.get('include_posters', 'false').lower() == 'true'
+    
+    movies = []
+    movie_items = list(movie_titles.items())
+    
+    if limit:
+        movie_items = movie_items[:limit]
+    
+    for movie_id, title in movie_items:
+        movie_info = {
+            'id': movie_id,
+            'title': title,
+            'year': extract_year(title),
+            'genres': movie_genres.get(movie_id, [])
+        }
+        
+        # Add poster URL if requested and available
+        if include_posters:
+            cached_metadata = rating_db.get_movie_metadata(movie_id)
+            if cached_metadata and cached_metadata.get('poster_path'):
+                movie_info['poster_url'] = tmdb_client.get_poster_url(cached_metadata['poster_path'])
+        
+        # Add user rating statistics
+        avg_rating, rating_count = rating_db.get_average_rating(movie_id)
+        if avg_rating > 0:
+            movie_info['user_rating'] = round(avg_rating, 2)
+            movie_info['user_rating_count'] = rating_count
+        
+        movies.append(movie_info)
+    
+    return jsonify({
+        'movies': movies,
+        'total': len(movies),
+        'has_posters': include_posters
+    })
 
 @app.route('/status')
 def status():
@@ -739,10 +870,11 @@ def status():
 
 @app.route('/search')
 def search_movies():
-    """Search movies by title"""
+    """Search movies by title with enhanced information"""
     query = request.args.get('q', '').lower()
     sort_by = request.args.get('sort', 'title')
     limit = request.args.get('limit', 50, type=int)
+    include_posters = request.args.get('include_posters', 'true').lower() == 'true'
     
     if not query:
         return jsonify({'error': 'Query parameter q is required'}), 400
@@ -751,11 +883,26 @@ def search_movies():
     matching_movies = []
     for movie_id, title in movie_titles.items():
         if query in title.lower():
-            matching_movies.append({
+            movie_info = {
                 'id': movie_id,
                 'title': title,
-                'year': extract_year(title)
-            })
+                'year': extract_year(title),
+                'genres': movie_genres.get(movie_id, [])
+            }
+            
+            # Add poster URL if requested and available
+            if include_posters:
+                cached_metadata = rating_db.get_movie_metadata(movie_id)
+                if cached_metadata and cached_metadata.get('poster_path'):
+                    movie_info['poster_url'] = tmdb_client.get_poster_url(cached_metadata['poster_path'])
+            
+            # Add user rating statistics
+            avg_rating, rating_count = rating_db.get_average_rating(movie_id)
+            if avg_rating > 0:
+                movie_info['user_rating'] = round(avg_rating, 2)
+                movie_info['user_rating_count'] = rating_count
+            
+            matching_movies.append(movie_info)
     
     # Sort results
     if sort_by == 'title':
@@ -764,6 +911,8 @@ def search_movies():
         matching_movies.sort(key=lambda x: x['id'])
     elif sort_by == 'year':
         matching_movies.sort(key=lambda x: x['year'], reverse=True)
+    elif sort_by == 'rating' and any('user_rating' in movie for movie in matching_movies):
+        matching_movies.sort(key=lambda x: x.get('user_rating', 0), reverse=True)
     
     # Limit results
     matching_movies = matching_movies[:limit]
@@ -772,7 +921,8 @@ def search_movies():
         'movies': matching_movies,
         'total': len(matching_movies),
         'query': query,
-        'sort': sort_by
+        'sort': sort_by,
+        'has_posters': include_posters
     })
 
 def extract_year(title):
@@ -784,7 +934,36 @@ def extract_year(title):
 def get_random_movies():
     """Get random movies for browsing"""
     limit = request.args.get('limit', 20, type=int)
-    movie_list = [{'id': movie_id, 'title': title} for movie_id, title in movie_titles.items()]
+    include_posters = request.args.get('include_posters', 'false').lower() == 'true'
+    
+    movie_list = []
+    for movie_id, title in movie_titles.items():
+        movie_info = {
+            'id': movie_id,
+            'title': title,
+            'year': extract_year(title),
+            'genres': movie_genres.get(movie_id, [])
+        }
+        
+        # Add poster URL if requested and available
+        has_poster = False
+        if include_posters:
+            cached_metadata = rating_db.get_movie_metadata(movie_id)
+            if cached_metadata and cached_metadata.get('poster_path'):
+                movie_info['poster_url'] = tmdb_client.get_poster_url(cached_metadata['poster_path'])
+                has_poster = True
+        
+        # Add user rating statistics
+        avg_rating, rating_count = rating_db.get_average_rating(movie_id)
+        if avg_rating > 0:
+            movie_info['user_rating'] = round(avg_rating, 2)
+            movie_info['user_rating_count'] = rating_count
+        
+        # If posters are requested, only include movies with posters
+        if include_posters and not has_poster:
+            continue
+            
+        movie_list.append(movie_info)
     
     if len(movie_list) > limit:
         random_movies = random.sample(movie_list, limit)
@@ -793,7 +972,8 @@ def get_random_movies():
     
     return jsonify({
         'movies': random_movies,
-        'total': len(random_movies)
+        'total': len(random_movies),
+        'has_posters': include_posters
     })
 
 @app.route('/movies/<int:movie_id>')
@@ -822,14 +1002,270 @@ def get_movie_details(movie_id):
         'stats': movie_stats
     })
 
+# === NEW ENDPOINTS FOR RATINGS AND MOVIE POSTERS ===
+
+@app.route('/movies/<int:movie_id>/enhanced')
+def get_enhanced_movie_details(movie_id):
+    """Get enhanced movie details with poster, metadata, and ratings"""
+    if movie_id not in movie_titles:
+        return jsonify({'error': f'Movie {movie_id} not found'}), 404
+    
+    movie_title = movie_titles[movie_id]
+    
+    # Get basic movie info
+    movie_info = {
+        'id': movie_id,
+        'title': movie_title,
+        'year': extract_year(movie_title),
+        'genres': movie_genres.get(movie_id, [])
+    }
+    
+    # Get cached metadata or fetch from TMDB
+    cached_metadata = rating_db.get_movie_metadata(movie_id)
+    
+    if not cached_metadata:
+        # Try to fetch from TMDB
+        year = extract_year(movie_title)
+        tmdb_data = tmdb_client.search_movie(movie_title, year)
+        
+        if tmdb_data:
+            # Get detailed information
+            detailed_data = tmdb_client.get_movie_details(tmdb_data['id'])
+            if detailed_data:
+                # Cache the metadata
+                rating_db.cache_movie_metadata(movie_id, detailed_data)
+                cached_metadata = rating_db.get_movie_metadata(movie_id)
+    
+    # Add TMDB data if available
+    if cached_metadata:
+        movie_info.update({
+            'poster_url': tmdb_client.get_poster_url(cached_metadata.get('poster_path')),
+            'backdrop_url': tmdb_client.get_backdrop_url(cached_metadata.get('backdrop_path')),
+            'overview': cached_metadata.get('overview'),
+            'release_date': cached_metadata.get('release_date'),
+            'runtime': cached_metadata.get('runtime'),
+            'tmdb_rating': cached_metadata.get('vote_average'),
+            'tmdb_votes': cached_metadata.get('vote_count'),
+            'cast': cached_metadata.get('cast', []),
+            'director': cached_metadata.get('director'),
+            'trailer_key': cached_metadata.get('trailer_key')
+        })
+    
+    # Get rating statistics
+    avg_rating, rating_count = rating_db.get_average_rating(movie_id)
+    movie_info.update({
+        'user_rating': round(avg_rating, 2) if avg_rating > 0 else None,
+        'user_rating_count': rating_count
+    })
+    
+    # Get original dataset statistics
+    if data is not None:
+        movie_data = data[data['item_id'] == movie_id]
+        if not movie_data.empty:
+            movie_info['original_stats'] = {
+                'average_rating': round(movie_data['rating'].mean(), 2),
+                'total_ratings': len(movie_data),
+                'rating_distribution': movie_data['rating'].value_counts().to_dict()
+            }
+    
+    return jsonify(movie_info)
+
+@app.route('/movies/<int:movie_id>/rate', methods=['POST'])
+def rate_movie(movie_id):
+    """Rate a movie"""
+    if movie_id not in movie_titles:
+        return jsonify({'error': f'Movie {movie_id} not found'}), 404
+    
+    data = request.get_json()
+    if not data:
+        return jsonify({'error': 'No data provided'}), 400
+    
+    user_id = data.get('user_id')
+    rating = data.get('rating')
+    
+    if not user_id or rating is None:
+        return jsonify({'error': 'user_id and rating are required'}), 400
+    
+    if not isinstance(rating, (int, float)) or rating < 1 or rating > 5:
+        return jsonify({'error': 'Rating must be between 1 and 5'}), 400
+    
+    # Save the rating
+    success = rating_db.add_rating(user_id, movie_id, rating)
+    
+    if success:
+        # Get updated statistics
+        avg_rating, rating_count = rating_db.get_average_rating(movie_id)
+        
+        return jsonify({
+            'success': True,
+            'message': 'Rating saved successfully',
+            'movie_id': movie_id,
+            'user_id': user_id,
+            'rating': rating,
+            'average_rating': round(avg_rating, 2),
+            'total_ratings': rating_count
+        })
+    else:
+        return jsonify({'error': 'Failed to save rating'}), 500
+
+@app.route('/users/<int:user_id>/ratings')
+def get_user_ratings(user_id):
+    """Get all ratings for a user"""
+    ratings = rating_db.get_user_ratings(user_id)
+    
+    # Enhance with movie information
+    enhanced_ratings = []
+    for rating in ratings:
+        movie_id = rating['movie_id']
+        if movie_id in movie_titles:
+            enhanced_rating = {
+                'movie_id': movie_id,
+                'title': movie_titles[movie_id],
+                'year': extract_year(movie_titles[movie_id]),
+                'rating': rating['rating'],
+                'timestamp': rating['timestamp']
+            }
+            
+            # Add poster if available
+            cached_metadata = rating_db.get_movie_metadata(movie_id)
+            if cached_metadata and cached_metadata.get('poster_path'):
+                enhanced_rating['poster_url'] = tmdb_client.get_poster_url(cached_metadata['poster_path'])
+            
+            enhanced_ratings.append(enhanced_rating)
+    
+    return jsonify({
+        'user_id': user_id,
+        'ratings': enhanced_ratings,
+        'total_ratings': len(enhanced_ratings)
+    })
+
+@app.route('/movies/<int:movie_id>/rating/<int:user_id>')
+def get_user_movie_rating(movie_id, user_id):
+    """Get a specific user's rating for a movie"""
+    if movie_id not in movie_titles:
+        return jsonify({'error': f'Movie {movie_id} not found'}), 404
+    
+    rating = rating_db.get_movie_rating(user_id, movie_id)
+    
+    return jsonify({
+        'movie_id': movie_id,
+        'user_id': user_id,
+        'rating': rating,
+        'has_rated': rating is not None
+    })
+
+@app.route('/users/<int:user_id>/watchlist')
+def get_user_watchlist(user_id):
+    """Get user's watchlist"""
+    watchlist_ids = rating_db.get_watchlist(user_id)
+    
+    # Enhance with movie information
+    watchlist_movies = []
+    for movie_id in watchlist_ids:
+        if movie_id in movie_titles:
+            movie_info = {
+                'id': movie_id,
+                'title': movie_titles[movie_id],
+                'year': extract_year(movie_titles[movie_id]),
+                'genres': movie_genres.get(movie_id, [])
+            }
+            
+            # Add poster if available
+            cached_metadata = rating_db.get_movie_metadata(movie_id)
+            if cached_metadata and cached_metadata.get('poster_path'):
+                movie_info['poster_url'] = tmdb_client.get_poster_url(cached_metadata['poster_path'])
+            
+            watchlist_movies.append(movie_info)
+    
+    return jsonify({
+        'user_id': user_id,
+        'watchlist': watchlist_movies,
+        'total_movies': len(watchlist_movies)
+    })
+
+@app.route('/users/<int:user_id>/watchlist/<int:movie_id>', methods=['POST'])
+def add_to_watchlist(user_id, movie_id):
+    """Add movie to user's watchlist"""
+    if movie_id not in movie_titles:
+        return jsonify({'error': f'Movie {movie_id} not found'}), 404
+    
+    success = rating_db.add_to_watchlist(user_id, movie_id)
+    
+    if success:
+        return jsonify({
+            'success': True,
+            'message': 'Movie added to watchlist',
+            'user_id': user_id,
+            'movie_id': movie_id
+        })
+    else:
+        return jsonify({'error': 'Failed to add to watchlist'}), 500
+
+@app.route('/users/<int:user_id>/watchlist/<int:movie_id>', methods=['DELETE'])
+def remove_from_watchlist(user_id, movie_id):
+    """Remove movie from user's watchlist"""
+    if movie_id not in movie_titles:
+        return jsonify({'error': f'Movie {movie_id} not found'}), 404
+    
+    success = rating_db.remove_from_watchlist(user_id, movie_id)
+    
+    if success:
+        return jsonify({
+            'success': True,
+            'message': 'Movie removed from watchlist',
+            'user_id': user_id,
+            'movie_id': movie_id
+        })
+    else:
+        return jsonify({'error': 'Failed to remove from watchlist'}), 500
+
+@app.route('/movies/batch-enhance', methods=['POST'])
+def batch_enhance_movies():
+    """Batch enhance movies with TMDB data"""
+    data = request.get_json()
+    if not data or 'movie_ids' not in data:
+        return jsonify({'error': 'movie_ids array is required'}), 400
+    
+    movie_ids = data['movie_ids']
+    enhanced_movies = []
+    
+    for movie_id in movie_ids:
+        if movie_id in movie_titles:
+            movie_info = {
+                'id': movie_id,
+                'title': movie_titles[movie_id],
+                'year': extract_year(movie_titles[movie_id]),
+                'genres': movie_genres.get(movie_id, [])
+            }
+            
+            # Get cached metadata
+            cached_metadata = rating_db.get_movie_metadata(movie_id)
+            if cached_metadata and cached_metadata.get('poster_path'):
+                movie_info['poster_url'] = tmdb_client.get_poster_url(cached_metadata['poster_path'])
+                movie_info['backdrop_url'] = tmdb_client.get_backdrop_url(cached_metadata.get('backdrop_path'))
+                movie_info['overview'] = cached_metadata.get('overview')
+                movie_info['tmdb_rating'] = cached_metadata.get('vote_average')
+            
+            # Get user rating statistics
+            avg_rating, rating_count = rating_db.get_average_rating(movie_id)
+            movie_info.update({
+                'user_rating': round(avg_rating, 2) if avg_rating > 0 else None,
+                'user_rating_count': rating_count
+            })
+            
+            enhanced_movies.append(movie_info)
+    
+    return jsonify({
+        'movies': enhanced_movies,
+        'total': len(enhanced_movies)
+    })
+
+# === END OF NEW ENDPOINTS ===
+
 if __name__ == '__main__':
-    print("Starting AI Movie Recommendation Engine...")
+    # Load data on startup
+    load_and_train_model()
     
-    try:
-        load_and_train_model()
-        print("Server is ready!")
-    except Exception as e:
-        print(f"Error during startup: {e}")
-        print("Server will start but some features may not work.")
-    
+    # Start the Flask server
+    print("Starting Flask server on http://localhost:5000")
     app.run(debug=True, host='0.0.0.0', port=5000)
