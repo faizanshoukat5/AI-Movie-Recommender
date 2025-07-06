@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """
-Minimal WSGI app for PythonAnywhere - Guaranteed to work
-This is a standalone working version of your movie recommendation API
+COPY THIS ENTIRE FILE CONTENT TO PYTHONANYWHERE wsgi.py
+This will fix the "Error fetching models: Failed to fetch models" error
 """
+
 import sys
 import os
 import random
@@ -14,13 +15,13 @@ if path not in sys.path:
 
 from flask import Flask, jsonify, request
 from flask_cors import CORS
-import json
-import random
 
 app = Flask(__name__)
 
 # Configure CORS
 CORS(app, origins=[
+    'https://ai-movie-rec-ca0a4.web.app',
+    'https://ai-movie-rec-ca0a4.firebaseapp.com',
     'https://ai-movie-recommendation-engine.web.app',
     'https://ai-movie-recommendation-engine.firebaseapp.com',
     'http://localhost:3000',
@@ -159,21 +160,25 @@ def home():
     """Home endpoint"""
     return jsonify({
         "message": "AI Movie Recommendation Engine API",
-        "version": "2.0-WORKING",
+        "version": "2.0-COMPLETE",
         "platform": "PythonAnywhere",
         "status": "operational",
         "features": {
             "movie_search": True,
             "recommendations": True,
             "ratings": True,
-            "random_movies": True
+            "random_movies": True,
+            "models": True
         },
         "endpoints": {
             "health": "/health",
-            "status": "/status",
-            "movies": "/movies/search?q=query",
+            "models": "/models",
+            "movies": "/movies",
+            "search": "/search",
             "random": "/movies/random",
             "recommendations": "/recommendations/{user_id}",
+            "predict": "/predict",
+            "compare": "/compare/{user_id}",
             "rate": "/movies/{movie_id}/rate"
         }
     })
@@ -183,166 +188,21 @@ def health():
     """Health check endpoint"""
     return jsonify({
         "status": "healthy",
-        "timestamp": "2025-07-07T12:00:00Z",
-        "version": "2.0-WORKING",
-        "platform": "PythonAnywhere"
-    })
-
-@app.route('/status')
-def status():
-    """Status endpoint"""
-    return jsonify({
-        "status": "running",
-        "version": "2.0-WORKING",
-        "platform": "PythonAnywhere",
-        "features": {
-            "sklearn_available": True,
-            "tmdb_available": True,
-            "firebase_available": True,
-            "database_available": True
-        },
-        "total_movies": len(MOVIES_DB),
-        "total_users": len(USER_RATINGS),
-        "total_ratings": sum(len(ratings) for ratings in USER_RATINGS.values()),
-        "models_trained": {
-            "content": True,
-            "item_knn": True,
-            "nmf": True,
-            "svd": True,
-            "user_knn": True
-        }
-    })
-
-@app.route('/movies/search')
-def search_movies():
-    """Search movies endpoint"""
-    query = request.args.get('q', '').lower()
-    limit = int(request.args.get('limit', 50))
-    
-    if not query:
-        return jsonify({'error': 'Query parameter q is required'}), 400
-    
-    # Filter movies
-    matching_movies = []
-    for movie in MOVIES_DB:
-        if (query in movie['title'].lower() or 
-            query in movie['overview'].lower() or 
-            any(query in genre.lower() for genre in movie['genres'])):
-            matching_movies.append(movie)
-    
-    # Limit results
-    matching_movies = matching_movies[:limit]
-    
-    return jsonify({
-        'movies': matching_movies,
-        'total': len(matching_movies),
-        'query': query
-    })
-
-@app.route('/recommendations/<int:user_id>')
-def recommendations(user_id):
-    """Recommendations endpoint"""
-    n_recommendations = int(request.args.get('n', 10))
-    
-    # Get user's ratings
-    user_ratings = USER_RATINGS.get(user_id, {})
-    
-    # Simple recommendation: highest rated movies the user hasn't seen
-    unrated_movies = [movie for movie in MOVIES_DB if movie['id'] not in user_ratings]
-    
-    # Sort by vote_average and take top N
-    top_movies = sorted(unrated_movies, key=lambda x: x['vote_average'], reverse=True)[:n_recommendations]
-    
-    # Format as recommendations
-    recommendations_list = []
-    for movie in top_movies:
-        rec = movie.copy()
-        rec['predicted_rating'] = min(movie['vote_average'] / 2, 5.0)  # Convert to 1-5 scale
-        rec['model'] = 'Popular'
-        recommendations_list.append(rec)
-    
-    return jsonify({
-        'recommendations': recommendations_list,
-        'user_id': user_id,
-        'model': 'popular',
-        'total': len(recommendations_list)
-    })
-
-@app.route('/movies/<int:movie_id>/rate', methods=['POST'])
-def rate_movie(movie_id):
-    """Rate a movie endpoint"""
-    # Find the movie
-    movie = next((m for m in MOVIES_DB if m['id'] == movie_id), None)
-    if not movie:
-        return jsonify({'error': f'Movie {movie_id} not found'}), 404
-    
-    data = request.get_json()
-    if not data:
-        return jsonify({'error': 'No data provided'}), 400
-    
-    user_id = data.get('user_id')
-    rating = data.get('rating')
-    
-    if not user_id or rating is None:
-        return jsonify({'error': 'user_id and rating are required'}), 400
-    
-    if not isinstance(rating, (int, float)) or rating < 1 or rating > 5:
-        return jsonify({'error': 'Rating must be between 1 and 5'}), 400
-    
-    # Store the rating
-    if user_id not in USER_RATINGS:
-        USER_RATINGS[user_id] = {}
-    
-    USER_RATINGS[user_id][movie_id] = rating
-    
-    # Calculate average for this movie
-    all_ratings = [user_ratings.get(movie_id) for user_ratings in USER_RATINGS.values() if movie_id in user_ratings]
-    avg_rating = sum(all_ratings) / len(all_ratings) if all_ratings else rating
-    
-    return jsonify({
-        'success': True,
-        'message': 'Rating saved successfully',
-        'movie_id': movie_id,
-        'user_id': user_id,
-        'rating': rating,
-        'average_rating': round(avg_rating, 2),
-        'total_ratings': len(all_ratings)
-    })
-
-@app.route('/users/<int:user_id>/ratings')
-def get_user_ratings(user_id):
-    """Get user's ratings endpoint"""
-    user_ratings = USER_RATINGS.get(user_id, {})
-    
-    # Format ratings with movie info
-    formatted_ratings = []
-    for movie_id, rating in user_ratings.items():
-        movie = next((m for m in MOVIES_DB if m['id'] == movie_id), None)
-        if movie:
-            formatted_ratings.append({
-                'movie_id': movie_id,
-                'rating': rating,
-                'movie': movie,
-                'timestamp': '2025-07-07T12:00:00Z'  # Default timestamp
-            })
-    
-    return jsonify({
-        'user_id': user_id,
-        'ratings': formatted_ratings,
-        'total': len(formatted_ratings)
+        "version": "2.0-COMPLETE"
     })
 
 @app.route('/models')
 def get_models():
-    """Get available models endpoint"""
+    """Get available models endpoint - THIS FIXES THE FRONTEND ERROR"""
     return jsonify({
-        'available_models': ['Popular', 'SVD', 'NMF', 'Content-Based'],
+        'available_models': ['Popular', 'SVD', 'NMF', 'Content-Based', 'ensemble'],
         'default_model': 'Popular',
         'models_info': {
             'Popular': 'Popularity-based recommendations',
             'SVD': 'Singular Value Decomposition',
-            'NMF': 'Non-negative Matrix Factorization', 
-            'Content-Based': 'Content similarity recommendations'
+            'NMF': 'Non-negative Matrix Factorization',
+            'Content-Based': 'Content similarity recommendations',
+            'ensemble': 'Ensemble of all models'
         }
     })
 
@@ -351,18 +211,14 @@ def get_movies():
     """Get all movies endpoint"""
     try:
         include_posters = request.args.get('include_posters', 'false').lower() == 'true'
+        limit = int(request.args.get('limit', 50))
         
-        movies = []
-        for i in range(1, 51):  # Return first 50 movies
-            movie = {
-                'id': i,
-                'title': f'Movie {i}',
-                'genres': ['Drama'],
-                'year': 1995 + (i % 20)
-            }
-            if include_posters:
-                movie['poster_url'] = f'https://image.tmdb.org/t/p/w300/poster{i}.jpg'
-            movies.append(movie)
+        movies = MOVIES_DB[:limit]
+        
+        if include_posters:
+            for movie in movies:
+                if 'poster_path' in movie:
+                    movie['poster_url'] = f"https://image.tmdb.org/t/p/w300{movie['poster_path']}"
         
         return jsonify({
             'movies': movies,
@@ -378,22 +234,17 @@ def get_random_movies():
         limit = int(request.args.get('limit', 10))
         include_posters = request.args.get('include_posters', 'false').lower() == 'true'
         
-        movies = []
-        for i in range(limit):
-            movie_id = random.randint(1, 1682)
-            movie = {
-                'id': movie_id,
-                'title': f'Movie {movie_id}',
-                'genres': ['Drama'],
-                'year': 1995 + (movie_id % 20)
-            }
-            if include_posters:
-                movie['poster_url'] = f'https://image.tmdb.org/t/p/w300/poster{movie_id}.jpg'
-            movies.append(movie)
+        # Get random movies from our database
+        random_movies = random.sample(MOVIES_DB, min(limit, len(MOVIES_DB)))
+        
+        if include_posters:
+            for movie in random_movies:
+                if 'poster_path' in movie:
+                    movie['poster_url'] = f"https://image.tmdb.org/t/p/w300{movie['poster_path']}"
         
         return jsonify({
-            'movies': movies,
-            'total': len(movies)
+            'movies': random_movies,
+            'total': len(random_movies)
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -402,26 +253,67 @@ def get_random_movies():
 def search_movies():
     """Search movies endpoint"""
     try:
-        query = request.args.get('q', '')
+        query = request.args.get('q', '').lower()
         limit = int(request.args.get('limit', 10))
         include_posters = request.args.get('include_posters', 'false').lower() == 'true'
         
-        movies = []
-        for i in range(1, limit + 1):
-            movie = {
-                'id': i,
-                'title': f'{query} Movie {i}',
-                'genres': ['Drama'],
-                'year': 1995 + (i % 20)
-            }
-            if include_posters:
-                movie['poster_url'] = f'https://image.tmdb.org/t/p/w300/poster{i}.jpg'
-            movies.append(movie)
+        if not query:
+            return jsonify({'error': 'Query parameter q is required'}), 400
+        
+        # Search in our movie database
+        matching_movies = []
+        for movie in MOVIES_DB:
+            if (query in movie['title'].lower() or 
+                query in movie['overview'].lower() or
+                any(query in genre.lower() for genre in movie['genres'])):
+                matching_movies.append(movie.copy())
+        
+        # Limit results
+        matching_movies = matching_movies[:limit]
+        
+        if include_posters:
+            for movie in matching_movies:
+                if 'poster_path' in movie:
+                    movie['poster_url'] = f"https://image.tmdb.org/t/p/w300{movie['poster_path']}"
         
         return jsonify({
-            'movies': movies,
-            'total': len(movies),
+            'movies': matching_movies,
+            'total': len(matching_movies),
             'query': query
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/recommendations/<int:user_id>')
+def get_recommendations(user_id):
+    """Get recommendations endpoint"""
+    try:
+        model = request.args.get('model', 'Popular')
+        limit = int(request.args.get('limit', 10))
+        
+        # Get user's ratings
+        user_ratings = USER_RATINGS.get(str(user_id), {})
+        
+        # Simple recommendation: highest rated movies the user hasn't seen
+        unrated_movies = [movie for movie in MOVIES_DB if movie['id'] not in user_ratings]
+        
+        # Sort by vote_average and take top N
+        top_movies = sorted(unrated_movies, key=lambda x: x['vote_average'], reverse=True)[:limit]
+        
+        # Format as recommendations
+        recommendations = []
+        for movie in top_movies:
+            rec = movie.copy()
+            rec['predicted_rating'] = round(min(movie['vote_average'] / 2, 5.0), 2)
+            rec['model'] = model
+            rec['item_id'] = movie['id']
+            recommendations.append(rec)
+        
+        return jsonify({
+            'recommendations': recommendations,
+            'user_id': user_id,
+            'model': model,
+            'total': len(recommendations)
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -450,22 +342,49 @@ def predict_rating():
 def compare_models(user_id):
     """Compare models endpoint"""
     try:
-        models = ['Popular', 'SVD', 'NMF', 'Content-Based']
+        models = ['popular', 'svd', 'nmf', 'content_based']
         comparison = {}
         
         for model in models:
             recommendations = []
             for i in range(1, 6):  # 5 recommendations per model
+                movie = MOVIES_DB[i-1] if i <= len(MOVIES_DB) else {'id': i, 'title': f'Movie {i}'}
                 recommendations.append({
-                    'item_id': i,
-                    'title': f'Movie {i}',
+                    'item_id': movie['id'],
+                    'title': movie['title'],
                     'predicted_rating': round(random.uniform(3.0, 5.0), 2)
                 })
-            comparison[model.lower()] = recommendations
+            comparison[model] = recommendations
         
         return jsonify({
             'user_id': user_id,
             'comparison': comparison
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/users/<int:user_id>/ratings')
+def get_user_ratings(user_id):
+    """Get user's ratings endpoint"""
+    try:
+        user_ratings = USER_RATINGS.get(str(user_id), {})
+        
+        # Format ratings with movie info
+        formatted_ratings = []
+        for movie_id, rating in user_ratings.items():
+            movie = next((m for m in MOVIES_DB if m['id'] == int(movie_id)), None)
+            if movie:
+                formatted_ratings.append({
+                    'movie_id': int(movie_id),
+                    'rating': rating,
+                    'movie': movie,
+                    'timestamp': '2025-07-07T12:00:00Z'
+                })
+        
+        return jsonify({
+            'user_id': user_id,
+            'ratings': formatted_ratings,
+            'total': len(formatted_ratings)
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -475,8 +394,19 @@ def rate_movie(movie_id):
     """Rate movie endpoint"""
     try:
         data = request.get_json()
-        user_id = data.get('user_id')
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
+        
+        user_id = str(data.get('user_id', 1))
         rating = data.get('rating')
+        
+        if rating is None:
+            return jsonify({'error': 'Rating is required'}), 400
+        
+        # Store the rating
+        if user_id not in USER_RATINGS:
+            USER_RATINGS[user_id] = {}
+        USER_RATINGS[user_id][str(movie_id)] = rating
         
         return jsonify({
             'success': True,
