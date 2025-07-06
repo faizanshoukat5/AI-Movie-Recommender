@@ -8,11 +8,20 @@ import RecommendationsPage from './pages/RecommendationsPage';
 import MyRatingsPage from './pages/MyRatingsPage';
 import PredictRatingPage from './pages/PredictRatingPage';
 import ModelComparisonPage from './pages/ModelComparisonPage';
+import UserProfile from './components/UserProfile';
+
+// Import authentication components
+import { AuthProvider, useAuth } from './AuthContext';
+import AuthModal from './AuthModal';
 
 // API Configuration - will use environment variable in production
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
-function App() {
+// Main App Component with Authentication
+function MainApp() {
+  const { currentUser, userProfile, rateMovie: firebaseRateMovie, syncLocalRatingsToFirebase } = useAuth();
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  
   const [recommendations, setRecommendations] = useState([]);
   const [prediction, setPrediction] = useState(null);
   const [movies, setMovies] = useState([]);
@@ -23,19 +32,31 @@ function App() {
   const [modelComparison, setModelComparison] = useState(null);
   const [availableModels, setAvailableModels] = useState([]);
 
-  // Form state
-  const [userId, setUserId] = useState(1);
+  // Form state - now using real user data
+  const [userId, setUserId] = useState(1); // Fallback for demo mode
   const [itemId, setItemId] = useState(1);
   const [numRecommendations, setNumRecommendations] = useState(10);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('title');
   const [selectedModel, setSelectedModel] = useState('ensemble');
 
-  // New state for ratings and enhanced features
+  // Enhanced features state
   const [userRatings, setUserRatings] = useState({});
   const [watchlist, setWatchlist] = useState([]);
   const [showRatingModal, setShowRatingModal] = useState(false);
   const [selectedMovieForRating, setSelectedMovieForRating] = useState(null);
+
+  // Get current user's ID for API calls
+  const getCurrentUserId = () => {
+    if (currentUser && userProfile) {
+      // Use a hash of the user's email for consistent user ID
+      return Math.abs(currentUser.email.split('').reduce((a, b) => {
+        a = ((a << 5) - a) + b.charCodeAt(0);
+        return a & a;
+      }, 0)) % 943 + 1; // Map to MovieLens user range
+    }
+    return userId; // Fallback to demo mode
+  };
 
   // Initialize data
   useEffect(() => {
@@ -58,6 +79,20 @@ function App() {
       setFilteredMovies(sortMovies(movies.slice(0, 100), sortBy));
     }
   }, [searchQuery, sortBy, movies]);
+
+  // Sync local ratings to Firebase when user logs in
+  useEffect(() => {
+    if (currentUser && userProfile && userRatings && Object.keys(userRatings).length > 0) {
+      // Only sync if the user has local ratings but few/no Firebase ratings
+      const firebaseRatingsCount = Object.keys(userProfile.preferences?.ratings || {}).length;
+      const localRatingsCount = Object.keys(userRatings).length;
+      
+      if (localRatingsCount > firebaseRatingsCount) {
+        console.log(`Syncing ${localRatingsCount} local ratings to Firebase...`);
+        syncLocalRatingsToFirebase(userRatings);
+      }
+    }
+  }, [currentUser, userProfile, userRatings, syncLocalRatingsToFirebase]);
 
   // Fetch available models
   const fetchAvailableModels = async () => {
@@ -201,23 +236,36 @@ function App() {
     }
   };
 
-  // Rate movie
-  const handleRateMovie = async (movieId, rating) => {
+  // Rate movie - sync with both Firebase and backend
+  const handleRateMovie = async (movieId, rating, review = '') => {
     try {
-      const response = await fetch(`${API_BASE_URL}/movies/${movieId}/rate`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          rating: rating,
-          user_id: userId
-        }),
-      });
-
-      if (!response.ok) throw new Error('Failed to rate movie');
+      // If user is logged in, use Firebase
+      if (currentUser && firebaseRateMovie) {
+        await firebaseRateMovie(movieId, rating, review);
+        console.log('Rating saved to Firebase');
+      }
       
-      // Update local state
+      // Also sync with backend for ML model
+      try {
+        const response = await fetch(`${API_BASE_URL}/movies/${movieId}/rate`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            rating: rating,
+            user_id: getCurrentUserId()
+          }),
+        });
+
+        if (response.ok) {
+          console.log('Rating synced with backend');
+        }
+      } catch (backendError) {
+        console.warn('Backend sync failed, but Firebase rating saved:', backendError);
+      }
+      
+      // Update local state for immediate UI feedback
       setUserRatings(prev => ({
         ...prev,
         [movieId]: rating
@@ -401,7 +449,7 @@ function App() {
   return (
     <Router>
       <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900">
-        <Navigation />
+        <Navigation onAuthClick={() => setShowAuthModal(true)} />
         
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <Routes>
@@ -427,7 +475,7 @@ function App() {
                 <RecommendationsPage 
                   recommendations={recommendations}
                   loading={loading}
-                  userId={userId}
+                  userId={getCurrentUserId()}
                   setUserId={setUserId}
                   numRecommendations={numRecommendations}
                   setNumRecommendations={setNumRecommendations}
@@ -488,8 +536,19 @@ function App() {
                 />
               } 
             />
+            <Route 
+              path="/profile" 
+              element={<UserProfile />} 
+            />
           </Routes>
         </main>
+
+        {/* Authentication Modal */}
+        <AuthModal
+          isOpen={showAuthModal}
+          onClose={() => setShowAuthModal(false)}
+          mode="login"
+        />
 
         {/* Rating Modal */}
         {showRatingModal && selectedMovieForRating && (
@@ -502,6 +561,15 @@ function App() {
         )}
       </div>
     </Router>
+  );
+}
+
+// Main App wrapper with Authentication
+function App() {
+  return (
+    <AuthProvider>
+      <MainApp />
+    </AuthProvider>
   );
 }
 

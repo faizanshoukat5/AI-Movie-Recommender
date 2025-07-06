@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useEffect } from 'react';
+import { useAuth } from '../AuthContext';
 
 const MyRatingsPage = ({ 
   userRatings, 
@@ -11,6 +12,34 @@ const MyRatingsPage = ({
   setSelectedMovieForRating,
   RatingModal 
 }) => {
+  const { currentUser, userProfile } = useAuth();
+  
+  // Real-time sync: Re-render when userProfile changes
+  useEffect(() => {
+    if (currentUser && userProfile) {
+      console.log('User profile updated, ratings synced');
+    }
+  }, [currentUser, userProfile]);
+  
+  // Use Firebase ratings if user is logged in, otherwise use local ratings
+  const ratingsToDisplay = currentUser && userProfile?.preferences?.ratings 
+    ? userProfile.preferences.ratings 
+    : userRatings;
+  
+  // Convert Firebase rating format to display format
+  const formatRatingsForDisplay = (ratings) => {
+    if (currentUser && userProfile?.preferences?.ratings) {
+      // Firebase format: { movieId: { rating, review, ratedAt, movieTitle, moviePoster } }
+      return Object.entries(ratings).reduce((acc, [movieId, ratingData]) => {
+        acc[movieId] = ratingData.rating;
+        return acc;
+      }, {});
+    }
+    // Local format: { movieId: rating }
+    return ratings;
+  };
+  
+  const displayRatings = formatRatingsForDisplay(ratingsToDisplay);
   return (
     <div className="space-y-6">
       <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 border border-white/20">
@@ -18,10 +47,10 @@ const MyRatingsPage = ({
           ⭐ My Ratings
         </h2>
         <p className="text-gray-300 mb-6">
-          📽️ You've rated {Object.keys(userRatings).length} movies
+          📽️ You've rated {Object.keys(displayRatings).length} movies
         </p>
         
-        {Object.keys(userRatings).length === 0 ? (
+        {Object.keys(displayRatings).length === 0 ? (
           <div className="text-center py-12">
             <div className="text-6xl mb-4">⭐</div>
             <h3 className="text-xl font-semibold text-white mb-2">No ratings yet</h3>
@@ -29,12 +58,23 @@ const MyRatingsPage = ({
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {Object.entries(userRatings).map(([movieId, rating]) => {
+            {Object.entries(displayRatings)
+              .sort((a, b) => {
+                // Sort by rating date if available (Firebase), otherwise by rating value
+                if (currentUser && userProfile?.preferences?.ratings) {
+                  const ratingA = userProfile.preferences.ratings[a[0]];
+                  const ratingB = userProfile.preferences.ratings[b[0]];
+                  return new Date(ratingB?.ratedAt || 0) - new Date(ratingA?.ratedAt || 0);
+                }
+                return b[1] - a[1]; // Sort by rating value for local ratings
+              })
+              .map(([movieId, rating]) => {
+              const firebaseRatingData = currentUser && userProfile?.preferences?.ratings?.[movieId];
               const movieData = movies.find(m => m.id === parseInt(movieId));
               const movie = { 
                 id: parseInt(movieId), 
-                title: movieData?.title || `Movie ${movieId}`,
-                poster_url: movieData?.poster_url
+                title: firebaseRatingData?.movieTitle || movieData?.title || `Movie ${movieId}`,
+                poster_url: firebaseRatingData?.moviePoster || movieData?.poster_url
               };
               
               return (
