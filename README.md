@@ -394,11 +394,6 @@ Special thanks to the amazing open-source community and these fantastic services
 - 📖 **Documentation**: Check the comprehensive docs in this repository
 - 💬 **Discussions**: [GitHub Discussions](https://github.com/faizanshoukat5/AI-Movie-Recommender/discussions)
 
-### **Connect**
-- 👨‍💻 **Developer**: [Faizan Shoukat](https://github.com/faizanshoukat5)
-- 🔗 **LinkedIn**: [Connect with me](https://linkedin.com/in/faizanshoukat5)
-- 📧 **Email**: faizan.shoukat5@example.com
-
 ---
 
 <div align="center">
