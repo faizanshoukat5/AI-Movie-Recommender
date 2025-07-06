@@ -41,13 +41,19 @@ chmod 755 logs
 3. **WSGI configuration file**: Set to `/home/fizu/AI-Movie-Recommender/wsgi.py`
 4. **Click "Reload"** button
 
-### **Step 6: Test Your Deployment**
+### **Step 6: Apply Fixes for Common Issues**
+```bash
+# Run the fix script to resolve common deployment issues
+python3.10 fix_pythonanywhere.py
+```
+
+### **Step 7: Test Your Deployment**
 Visit these URLs:
 - **API Info**: [https://fizu.pythonanywhere.com/](https://fizu.pythonanywhere.com/)
 - **Health Check**: [https://fizu.pythonanywhere.com/health](https://fizu.pythonanywhere.com/health)
 - **System Status**: [https://fizu.pythonanywhere.com/status](https://fizu.pythonanywhere.com/status)
 
-### **Step 7: Verify Features**
+### **Step 8: Verify Features**
 Check the `/status` endpoint should show:
 ```json
 {
