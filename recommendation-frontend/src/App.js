@@ -9,7 +9,8 @@ import MyRatingsPage from './pages/MyRatingsPage';
 import PredictRatingPage from './pages/PredictRatingPage';
 import ModelComparisonPage from './pages/ModelComparisonPage';
 
-const API_BASE_URL = 'http://localhost:5000';
+// API Configuration - will use environment variable in production
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
 function App() {
   const [recommendations, setRecommendations] = useState([]);
