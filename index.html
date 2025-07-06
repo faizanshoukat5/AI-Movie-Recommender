@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Movie Recommendation Engine</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background-color: #fafafa;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+        input, select, button {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        input, select {
+            width: 200px;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .results {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #e9f7ef;
+            border-radius: 5px;
+            border-left: 4px solid #28a745;
+        }
+        .error {
+            background-color: #f8d7da;
+            border-left: 4px solid #dc3545;
+            color: #721c24;
+        }
+        .recommendation-item {
+            padding: 8px;
+            margin: 5px 0;
+            background: white;
+            border-radius: 3px;
+            border-left: 3px solid #007bff;
+        }
+        .endpoint {
+            font-family: monospace;
+            background-color: #f8f9fa;
+            padding: 5px 10px;
+            border-radius: 3px;
+            color: #495057;
+        }
+        .status-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 10px;
+        }
+        .status-healthy { background-color: #28a745; }
+        .status-error { background-color: #dc3545; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎬 AI Movie Recommendation Engine API</h1>
+        
+        <!-- Health Check Section -->
+        <div class="section">
+            <h3>API Health Status</h3>
+            <button onclick="checkHealth()">Check API Health</button>
+            <div id="health-result"></div>
+        </div>
+
+        <!-- Recommendations Section -->
+        <div class="section">
+            <h3>Get Recommendations</h3>
+            <div class="form-group">
+                <label for="user-id">User ID (1-943):</label>
+                <input type="number" id="user-id" value="1" min="1" max="943">
+            </div>
+            <div class="form-group">
+                <label for="num-recommendations">Number of Recommendations:</label>
+                <input type="number" id="num-recommendations" value="5" min="1" max="20">
+            </div>
+            <div class="form-group">
+                <label for="algorithm">Algorithm:</label>
+                <select id="algorithm">
+                    <option value="svd">SVD (Matrix Factorization)</option>
+                    <option value="collaborative">Collaborative Filtering</option>
+                </select>
+            </div>
+            <button onclick="getRecommendations()">Get Recommendations</button>
+            <div id="recommendations-result"></div>
+        </div>
+
+        <!-- Rating Prediction Section -->
+        <div class="section">
+            <h3>Predict Rating</h3>
+            <div class="form-group">
+                <label for="predict-user-id">User ID:</label>
+                <input type="number" id="predict-user-id" value="1" min="1" max="943">
+            </div>
+            <div class="form-group">
+                <label for="predict-item-id">Item ID (1-1682):</label>
+                <input type="number" id="predict-item-id" value="50" min="1" max="1682">
+            </div>
+            <button onclick="predictRating()">Predict Rating</button>
+            <div id="prediction-result"></div>
+        </div>
+
+        <!-- API Documentation -->
+        <div class="section">
+            <h3>Available API Endpoints</h3>
+            <ul>
+                <li><span class="endpoint">GET /health</span> - Check API health status</li>
+                <li><span class="endpoint">GET /recommendations/&lt;user_id&gt;?n=5&algorithm=svd</span> - Get recommendations</li>
+                <li><span class="endpoint">GET /predict/&lt;user_id&gt;/&lt;item_id&gt;</span> - Predict rating</li>
+                <li><span class="endpoint">GET /users</span> - Get all available users</li>
+                <li><span class="endpoint">GET /items</span> - Get all available items</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:5000';
+
+        async function checkHealth() {
+            try {
+                const response = await fetch(`${API_BASE}/health`);
+                const data = await response.json();
+                
+                let statusClass = data.status === 'healthy' ? 'status-healthy' : 'status-error';
+                let resultClass = response.ok ? 'results' : 'results error';
+                
+                document.getElementById('health-result').innerHTML = `
+                    <div class="${resultClass}">
+                        <div><span class="status-indicator ${statusClass}"></span><strong>Status:</strong> ${data.status}</div>
+                        <div><strong>Model Trained:</strong> ${data.model_trained ? 'Yes' : 'No'}</div>
+                        <div><strong>Data Loaded:</strong> ${data.data_loaded ? 'Yes' : 'No'}</div>
+                    </div>
+                `;
+            } catch (error) {
+                document.getElementById('health-result').innerHTML = `
+                    <div class="results error">
+                        <strong>Error:</strong> ${error.message}
+                    </div>
+                `;
+            }
+        }
+
+        async function getRecommendations() {
+            const userId = document.getElementById('user-id').value;
+            const numRecs = document.getElementById('num-recommendations').value;
+            const algorithm = document.getElementById('algorithm').value;
+            
+            try {
+                const response = await fetch(`${API_BASE}/recommendations/${userId}?n=${numRecs}&algorithm=${algorithm}`);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    let html = `
+                        <div class="results">
+                            <h4>Recommendations for User ${data.user_id} (${data.algorithm.toUpperCase()})</h4>
+                            <div><strong>Total recommendations:</strong> ${data.count}</div>
+                    `;
+                    
+                    data.recommendations.forEach((rec, index) => {
+                        html += `
+                            <div class="recommendation-item">
+                                <strong>${index + 1}.</strong> Item ${rec.item_id} - 
+                                Predicted Rating: <strong>${rec.predicted_rating.toFixed(2)}</strong>
+                            </div>
+                        `;
+                    });
+                    
+                    html += '</div>';
+                    document.getElementById('recommendations-result').innerHTML = html;
+                } else {
+                    document.getElementById('recommendations-result').innerHTML = `
+                        <div class="results error">
+                            <strong>Error:</strong> ${data.error}
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                document.getElementById('recommendations-result').innerHTML = `
+                    <div class="results error">
+                        <strong>Error:</strong> ${error.message}
+                    </div>
+                `;
+            }
+        }
+
+        async function predictRating() {
+            const userId = document.getElementById('predict-user-id').value;
+            const itemId = document.getElementById('predict-item-id').value;
+            
+            try {
+                const response = await fetch(`${API_BASE}/predict/${userId}/${itemId}`);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    let html = `
+                        <div class="results">
+                            <h4>Rating Prediction</h4>
+                            <div><strong>User:</strong> ${data.user_id}</div>
+                            <div><strong>Item:</strong> ${data.item_id}</div>
+                            <div><strong>Predicted Rating:</strong> ${data.predicted_rating.toFixed(2)}</div>
+                    `;
+                    
+                    if (data.actual_rating !== null) {
+                        html += `
+                            <div><strong>Actual Rating:</strong> ${data.actual_rating}</div>
+                            <div><strong>Prediction Error:</strong> ${data.error.toFixed(2)}</div>
+                        `;
+                    } else {
+                        html += '<div><em>No actual rating available (unrated item)</em></div>';
+                    }
+                    
+                    html += '</div>';
+                    document.getElementById('prediction-result').innerHTML = html;
+                } else {
+                    document.getElementById('prediction-result').innerHTML = `
+                        <div class="results error">
+                            <strong>Error:</strong> ${data.error}
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                document.getElementById('prediction-result').innerHTML = `
+                    <div class="results error">
+                        <strong>Error:</strong> ${error.message}
+                    </div>
+                `;
+            }
+        }
+
+        // Check health on page load
+        window.onload = function() {
+            checkHealth();
+        };
+    </script>
+</body>
+</html>

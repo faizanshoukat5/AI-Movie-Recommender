@@ -1,0 +1,835 @@
+from flask import Flask, jsonify, request
+from flask_cors import CORS
+import pandas as pd
+import numpy as np
+from sklearn.metrics.pairwise import cosine_similarity
+from sklearn.decomposition import TruncatedSVD, NMF
+from sklearn.model_selection import train_test_split
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.neighbors import NearestNeighbors
+import os
+import re
+import random
+from collections import defaultdict
+import warnings
+warnings.filterwarnings('ignore')
+import re
+import random
+
+app = Flask(__name__)
+CORS(app)
+
+# Global variables to store multiple trained models and data
+models = {
+    'svd': None,
+    'nmf': None,
+    'item_knn': None,
+    'user_knn': None,
+    'content': None
+}
+train_user_item_matrix = None
+data = None
+user_item_matrix = None
+movie_titles = {}
+movie_genres = {}
+item_similarity_matrix = None
+user_similarity_matrix = None
+
+def load_movie_titles():
+    """Load movie titles and genres from u.item file"""
+    movie_titles = {}
+    movie_genres = {}
+    movies_file = 'ml-100k/u.item'
+    
+    if os.path.exists(movies_file):
+        try:
+            with open(movies_file, 'r', encoding='iso-8859-1') as f:
+                for line in f:
+                    fields = line.strip().split('|')
+                    if len(fields) >= 24:  # Ensure we have genre columns
+                        movie_id = int(fields[0])
+                        movie_title = fields[1]
+                        movie_titles[movie_id] = movie_title
+                        
+                        # Extract genres (columns 5-23 are genre indicators)
+                        genre_names = [
+                            'unknown', 'Action', 'Adventure', 'Animation', 'Children\'s',
+                            'Comedy', 'Crime', 'Documentary', 'Drama', 'Fantasy',
+                            'Film-Noir', 'Horror', 'Musical', 'Mystery', 'Romance',
+                            'Sci-Fi', 'Thriller', 'War', 'Western'
+                        ]
+                        genres = []
+                        for i, genre_flag in enumerate(fields[5:24]):
+                            if genre_flag == '1' and i < len(genre_names):
+                                genres.append(genre_names[i])
+                        movie_genres[movie_id] = ' '.join(genres) if genres else 'unknown'
+                    elif len(fields) >= 2:
+                        # Fallback for basic title extraction
+                        movie_id = int(fields[0])
+                        movie_title = fields[1]
+                        movie_titles[movie_id] = movie_title
+                        movie_genres[movie_id] = 'unknown'
+                        
+            print(f"Loaded {len(movie_titles)} movie titles and genres")
+        except Exception as e:
+            print(f"Error loading movie titles: {e}")
+    else:
+        print("Movie titles file (u.item) not found")
+    
+    return movie_titles, movie_genres
+
+def load_and_train_model():
+    """Load data and train multiple recommendation models"""
+    global models, train_user_item_matrix, data, user_item_matrix, movie_titles, movie_genres
+    global item_similarity_matrix, user_similarity_matrix
+    
+    # Load movie titles and genres
+    movie_titles, movie_genres = load_movie_titles()
+    
+    # Check if data file exists
+    data_file = 'ml-100k/u.data'
+    if not os.path.exists(data_file):
+        raise FileNotFoundError("Data file 'ml-100k/u.data' not found.")
+    
+    # Load data
+    column_names = ['user_id', 'item_id', 'rating', 'timestamp']
+    data = pd.read_csv(data_file, sep='\t', names=column_names)
+    
+    print(f"Loaded {len(data)} ratings from {data['user_id'].nunique()} users and {data['item_id'].nunique()} movies")
+    
+    # Split data
+    train_data, test_data = train_test_split(data, test_size=0.2, random_state=42)
+    
+    # Create user-item matrices
+    def create_user_item_matrix(data):
+        return data.pivot_table(index='user_id', columns='item_id', values='rating', fill_value=0)
+    
+    train_user_item_matrix = create_user_item_matrix(train_data)
+    user_item_matrix = create_user_item_matrix(data)
+    
+    print("Training multiple recommendation models...")
+    
+    # 1. SVD Model (Matrix Factorization)
+    print("Training SVD model...")
+    models['svd'] = TruncatedSVD(n_components=50, random_state=42)
+    models['svd'].fit(train_user_item_matrix)
+    
+    # 2. NMF Model (Non-negative Matrix Factorization)
+    print("Training NMF model...")
+    models['nmf'] = NMF(n_components=50, random_state=42, max_iter=200)
+    models['nmf'].fit(train_user_item_matrix)
+    
+    # 3. Item-based Collaborative Filtering
+    print("Training Item-based KNN...")
+    item_item_matrix = train_user_item_matrix.T  # Transpose to get item-user matrix
+    models['item_knn'] = NearestNeighbors(n_neighbors=20, metric='cosine')
+    models['item_knn'].fit(item_item_matrix)
+    
+    # Precompute item similarity matrix for faster recommendations
+    item_similarity_matrix = cosine_similarity(item_item_matrix)
+    
+    # 4. User-based Collaborative Filtering
+    print("Training User-based KNN...")
+    models['user_knn'] = NearestNeighbors(n_neighbors=20, metric='cosine')
+    models['user_knn'].fit(train_user_item_matrix)
+    
+    # Precompute user similarity matrix
+    user_similarity_matrix = cosine_similarity(train_user_item_matrix)
+    
+    # 5. Content-based Filtering
+    print("Training Content-based model...")
+    # Create content features from genres
+    content_features = []
+    movie_ids = []
+    for movie_id in movie_genres:
+        if movie_id in train_user_item_matrix.columns:
+            content_features.append(movie_genres[movie_id])
+            movie_ids.append(movie_id)
+    
+    if content_features:
+        tfidf = TfidfVectorizer(max_features=100, stop_words='english')
+        content_matrix = tfidf.fit_transform(content_features)
+        models['content'] = {
+            'tfidf': tfidf,
+            'content_matrix': content_matrix,
+            'movie_ids': movie_ids
+        }
+    
+    print("All models trained successfully!")
+    return True
+
+def get_svd_recommendations(user_id, n_recommendations=10):
+    """Get recommendations using SVD model"""
+    if models['svd'] is None:
+        return {"error": "SVD model not trained"}
+    
+    if user_id not in train_user_item_matrix.index:
+        return {"error": f"User {user_id} not found in dataset"}
+    
+    try:
+        # Transform the user-item matrix using the trained SVD model
+        user_factors = models['svd'].transform(train_user_item_matrix)
+        item_factors = models['svd'].components_
+        
+        # Reconstruct the ratings matrix
+        predicted_ratings = np.dot(user_factors, item_factors)
+        predicted_ratings_df = pd.DataFrame(predicted_ratings, 
+                                          index=train_user_item_matrix.index,
+                                          columns=train_user_item_matrix.columns)
+        
+        # Get items that the user hasn't rated
+        user_ratings = train_user_item_matrix.loc[user_id]
+        unrated_items = user_ratings[user_ratings == 0].index
+        
+        # Get predicted ratings for unrated items
+        user_predictions = predicted_ratings_df.loc[user_id, unrated_items]
+        
+        # Get top N recommendations
+        top_recommendations = user_predictions.nlargest(n_recommendations)
+        
+        # Format recommendations with movie titles
+        recommendations = []
+        for item_id, predicted_rating in top_recommendations.items():
+            movie_title = movie_titles.get(item_id, f"Movie {item_id}")
+            recommendations.append({
+                'item_id': int(item_id),
+                'title': movie_title,
+                'predicted_rating': round(float(predicted_rating), 2),
+                'model': 'SVD'
+            })
+        
+        return recommendations
+    
+    except Exception as e:
+        return {"error": f"Error generating SVD recommendations: {str(e)}"}
+
+def get_nmf_recommendations(user_id, n_recommendations=10):
+    """Get recommendations using NMF model"""
+    if models['nmf'] is None:
+        return {"error": "NMF model not trained"}
+    
+    if user_id not in train_user_item_matrix.index:
+        return {"error": f"User {user_id} not found in dataset"}
+    
+    try:
+        # Transform the user-item matrix using the trained NMF model
+        user_factors = models['nmf'].transform(train_user_item_matrix)
+        item_factors = models['nmf'].components_
+        
+        # Reconstruct the ratings matrix
+        predicted_ratings = np.dot(user_factors, item_factors)
+        predicted_ratings_df = pd.DataFrame(predicted_ratings, 
+                                          index=train_user_item_matrix.index,
+                                          columns=train_user_item_matrix.columns)
+        
+        # Get items that the user hasn't rated
+        user_ratings = train_user_item_matrix.loc[user_id]
+        unrated_items = user_ratings[user_ratings == 0].index
+        
+        # Get predicted ratings for unrated items
+        user_predictions = predicted_ratings_df.loc[user_id, unrated_items]
+        
+        # Get top N recommendations
+        top_recommendations = user_predictions.nlargest(n_recommendations)
+        
+        # Format recommendations with movie titles
+        recommendations = []
+        for item_id, predicted_rating in top_recommendations.items():
+            movie_title = movie_titles.get(item_id, f"Movie {item_id}")
+            recommendations.append({
+                'item_id': int(item_id),
+                'title': movie_title,
+                'predicted_rating': round(float(predicted_rating), 2),
+                'model': 'NMF'
+            })
+        
+        return recommendations
+    
+    except Exception as e:
+        return {"error": f"Error generating NMF recommendations: {str(e)}"}
+
+def get_item_knn_recommendations(user_id, n_recommendations=10):
+    """Get recommendations using item-based KNN (optimized)"""
+    if models['item_knn'] is None or item_similarity_matrix is None:
+        return {"error": "Item-based KNN model not trained"}
+    
+    if user_id not in train_user_item_matrix.index:
+        return {"error": f"User {user_id} not found in dataset"}
+    
+    try:
+        print(f"Getting item-KNN recommendations for user {user_id}")
+        user_ratings = train_user_item_matrix.loc[user_id]
+        unrated_items = user_ratings[user_ratings == 0].index
+        
+        # Limit to top 100 unrated items for speed
+        unrated_items = unrated_items[:100]
+        
+        # Calculate predictions for unrated items (simplified)
+        predictions = {}
+        rated_items = user_ratings[user_ratings > 0]
+        
+        for item_id in unrated_items:
+            try:
+                item_idx = list(train_user_item_matrix.columns).index(item_id)
+                
+                # Get top 10 similar items for speed
+                similarities = []
+                for rated_item_id in rated_items.index[:20]:  # Limit to top 20 rated items
+                    rated_item_idx = list(train_user_item_matrix.columns).index(rated_item_id)
+                    similarity = item_similarity_matrix[item_idx][rated_item_idx]
+                    if similarity > 0.1:  # Only consider items with reasonable similarity
+                        similarities.append((similarity, rated_items[rated_item_id]))
+                
+                # Calculate weighted average prediction
+                if similarities:
+                    similarities.sort(reverse=True)
+                    top_similarities = similarities[:10]  # Top 10 similar items
+                    numerator = sum(sim * rating for sim, rating in top_similarities)
+                    denominator = sum(sim for sim, _ in top_similarities)
+                    predictions[item_id] = numerator / denominator if denominator > 0 else 0
+            except (ValueError, IndexError):
+                continue
+        
+        # Get top N recommendations
+        top_items = sorted(predictions.items(), key=lambda x: x[1], reverse=True)[:n_recommendations]
+        
+        # Format recommendations with movie titles
+        recommendations = []
+        for item_id, predicted_rating in top_items:
+            movie_title = movie_titles.get(item_id, f"Movie {item_id}")
+            recommendations.append({
+                'item_id': int(item_id),
+                'title': movie_title,
+                'predicted_rating': round(float(predicted_rating), 2),
+                'model': 'Item-KNN'
+            })
+        
+        print(f"Returning {len(recommendations)} item-KNN recommendations")
+        return recommendations
+    
+    except Exception as e:
+        print(f"Error in item-KNN: {str(e)}")
+        return {"error": f"Error generating Item-KNN recommendations: {str(e)}"}
+
+def get_user_knn_recommendations(user_id, n_recommendations=10):
+    """Get recommendations using user-based KNN (optimized)"""
+    if models['user_knn'] is None or user_similarity_matrix is None:
+        return {"error": "User-based KNN model not trained"}
+    
+    if user_id not in train_user_item_matrix.index:
+        return {"error": f"User {user_id} not found in dataset"}
+    
+    try:
+        print(f"Getting user-KNN recommendations for user {user_id}")
+        user_idx = list(train_user_item_matrix.index).index(user_id)
+        user_ratings = train_user_item_matrix.loc[user_id]
+        unrated_items = user_ratings[user_ratings == 0].index
+        
+        # Limit to top 100 unrated items for speed
+        unrated_items = unrated_items[:100]
+        
+        # Find top 20 similar users for speed
+        user_similarities = user_similarity_matrix[user_idx]
+        similar_user_indices = np.argsort(user_similarities)[::-1][1:21]  # Top 20 similar users
+        similar_users = []
+        
+        for idx in similar_user_indices:
+            other_user_id = list(train_user_item_matrix.index)[idx]
+            similarity = user_similarities[idx]
+            if similarity > 0.1:  # Only consider users with reasonable similarity
+                similar_users.append((other_user_id, similarity))
+        
+        # Calculate predictions for unrated items
+        predictions = {}
+        for item_id in unrated_items:
+            # Find similar users who have rated this item
+            ratings_from_similar = []
+            for similar_user_id, similarity in similar_users:
+                similar_user_rating = train_user_item_matrix.loc[similar_user_id, item_id]
+                if similar_user_rating > 0:
+                    ratings_from_similar.append((similarity, similar_user_rating))
+            
+            # Calculate weighted average prediction
+            if ratings_from_similar:
+                ratings_from_similar.sort(reverse=True)
+                top_ratings = ratings_from_similar[:10]  # Top 10 similar users
+                numerator = sum(sim * rating for sim, rating in top_ratings)
+                denominator = sum(sim for sim, _ in top_ratings)
+                predictions[item_id] = numerator / denominator if denominator > 0 else 0
+        
+        # Get top N recommendations
+        top_items = sorted(predictions.items(), key=lambda x: x[1], reverse=True)[:n_recommendations]
+        
+        # Format recommendations with movie titles
+        recommendations = []
+        for item_id, predicted_rating in top_items:
+            movie_title = movie_titles.get(item_id, f"Movie {item_id}")
+            recommendations.append({
+                'item_id': int(item_id),
+                'title': movie_title,
+                'predicted_rating': round(float(predicted_rating), 2),
+                'model': 'User-KNN'
+            })
+        
+        print(f"Returning {len(recommendations)} user-KNN recommendations")
+        return recommendations
+    
+    except Exception as e:
+        print(f"Error in user-KNN: {str(e)}")
+        return {"error": f"Error generating User-KNN recommendations: {str(e)}"}
+
+def get_content_recommendations(user_id, n_recommendations=10):
+    """Get recommendations using content-based filtering"""
+    if models['content'] is None:
+        return {"error": "Content-based model not trained"}
+    
+    if user_id not in train_user_item_matrix.index:
+        return {"error": f"User {user_id} not found in dataset"}
+    
+    try:
+        user_ratings = train_user_item_matrix.loc[user_id]
+        rated_items = user_ratings[user_ratings > 0]
+        unrated_items = user_ratings[user_ratings == 0].index
+        
+        # Get user profile based on rated items
+        user_profile = np.zeros(models['content']['content_matrix'].shape[1])
+        total_weight = 0
+        
+        for item_id, rating in rated_items.items():
+            if item_id in models['content']['movie_ids']:
+                item_idx = models['content']['movie_ids'].index(item_id)
+                item_features = models['content']['content_matrix'][item_idx].toarray().flatten()
+                user_profile += item_features * rating
+                total_weight += rating
+        
+        if total_weight > 0:
+            user_profile = user_profile / total_weight
+        
+        # Calculate similarity between user profile and unrated items
+        predictions = {}
+        for item_id in unrated_items:
+            if item_id in models['content']['movie_ids']:
+                item_idx = models['content']['movie_ids'].index(item_id)
+                item_features = models['content']['content_matrix'][item_idx].toarray().flatten()
+                similarity = cosine_similarity([user_profile], [item_features])[0][0]
+                predictions[item_id] = similarity
+        
+        # Get top N recommendations
+        top_items = sorted(predictions.items(), key=lambda x: x[1], reverse=True)[:n_recommendations]
+        
+        # Format recommendations with movie titles
+        recommendations = []
+        for item_id, similarity_score in top_items:
+            movie_title = movie_titles.get(item_id, f"Movie {item_id}")
+            recommendations.append({
+                'item_id': int(item_id),
+                'title': movie_title,
+                'predicted_rating': round(float(similarity_score * 5), 2),  # Scale similarity to rating
+                'model': 'Content-Based'
+            })
+        
+        return recommendations
+    
+    except Exception as e:
+        return {"error": f"Error generating Content-Based recommendations: {str(e)}"}
+
+def get_ensemble_recommendations(user_id, n_recommendations=10, weights=None):
+    """Get ensemble recommendations by combining multiple models"""
+    if weights is None:
+        weights = {'svd': 0.4, 'nmf': 0.3, 'content': 0.3}  # Simplified to faster models
+    
+    print(f"Getting ensemble recommendations for user {user_id}")
+    
+    # Get recommendations from each model (only use faster models for ensemble)
+    all_recommendations = {}
+    
+    try:
+        # SVD (fast)
+        print("Getting SVD recommendations...")
+        svd_recs = get_svd_recommendations(user_id, n_recommendations * 2)
+        if not isinstance(svd_recs, dict) or 'error' not in svd_recs:
+            for rec in svd_recs:
+                item_id = rec['item_id']
+                if item_id not in all_recommendations:
+                    all_recommendations[item_id] = {'scores': {}, 'title': rec['title']}
+                all_recommendations[item_id]['scores']['svd'] = rec['predicted_rating']
+        
+        # NMF (fast)
+        print("Getting NMF recommendations...")
+        nmf_recs = get_nmf_recommendations(user_id, n_recommendations * 2)
+        if not isinstance(nmf_recs, dict) or 'error' not in nmf_recs:
+            for rec in nmf_recs:
+                item_id = rec['item_id']
+                if item_id not in all_recommendations:
+                    all_recommendations[item_id] = {'scores': {}, 'title': rec['title']}
+                all_recommendations[item_id]['scores']['nmf'] = rec['predicted_rating']
+        
+        # Content-Based (fast)
+        print("Getting Content-based recommendations...")
+        content_recs = get_content_recommendations(user_id, n_recommendations * 2)
+        if not isinstance(content_recs, dict) or 'error' not in content_recs:
+            for rec in content_recs:
+                item_id = rec['item_id']
+                if item_id not in all_recommendations:
+                    all_recommendations[item_id] = {'scores': {}, 'title': rec['title']}
+                all_recommendations[item_id]['scores']['content'] = rec['predicted_rating']
+        
+        # Skip KNN models for now as they are too slow
+        
+        print(f"Got {len(all_recommendations)} unique recommendations")
+        
+        # Calculate weighted ensemble scores
+        ensemble_scores = {}
+        for item_id, data in all_recommendations.items():
+            weighted_score = 0
+            total_weight = 0
+            for model, score in data['scores'].items():
+                if model in weights:
+                    weighted_score += score * weights[model]
+                    total_weight += weights[model]
+            
+            if total_weight > 0:
+                ensemble_scores[item_id] = {
+                    'score': weighted_score / total_weight,
+                    'title': data['title'],
+                    'model_scores': data['scores']
+                }
+        
+        # Get top N recommendations
+        top_items = sorted(ensemble_scores.items(), key=lambda x: x[1]['score'], reverse=True)[:n_recommendations]
+        
+        # Format recommendations
+        recommendations = []
+        for item_id, data in top_items:
+            recommendations.append({
+                'item_id': int(item_id),
+                'title': data['title'],
+                'predicted_rating': round(float(data['score']), 2),
+                'model': 'Ensemble',
+                'model_scores': data['model_scores']
+            })
+        
+        print(f"Returning {len(recommendations)} ensemble recommendations")
+        return recommendations
+    
+    except Exception as e:
+        print(f"Error in ensemble recommendations: {str(e)}")
+        return {"error": f"Error generating ensemble recommendations: {str(e)}"}
+
+def get_user_recommendations(user_id, n_recommendations=10, model='ensemble'):
+    """Get recommendations for a specific user using specified model"""
+    if model == 'svd':
+        return get_svd_recommendations(user_id, n_recommendations)
+    elif model == 'nmf':
+        return get_nmf_recommendations(user_id, n_recommendations)
+    elif model == 'item_knn':
+        return get_item_knn_recommendations(user_id, n_recommendations)
+    elif model == 'user_knn':
+        return get_user_knn_recommendations(user_id, n_recommendations)
+    elif model == 'content':
+        return get_content_recommendations(user_id, n_recommendations)
+    elif model == 'ensemble':
+        return get_ensemble_recommendations(user_id, n_recommendations)
+    else:
+        return {"error": f"Unknown model: {model}. Available models: svd, nmf, item_knn, user_knn, content, ensemble"}
+
+def predict_rating(user_id, item_id, model='svd'):
+    """Predict rating for a specific user-item pair using specified model"""
+    if user_id not in train_user_item_matrix.index:
+        return {"error": f"User {user_id} not found in dataset"}
+    
+    if item_id not in train_user_item_matrix.columns:
+        return {"error": f"Item {item_id} not found in dataset"}
+    
+    try:
+        movie_title = movie_titles.get(item_id, f"Movie {item_id}")
+        
+        if model == 'svd' and models['svd'] is not None:
+            user_factors = models['svd'].transform(train_user_item_matrix)
+            item_factors = models['svd'].components_
+            predicted_ratings = np.dot(user_factors, item_factors)
+            predicted_ratings_df = pd.DataFrame(predicted_ratings, 
+                                              index=train_user_item_matrix.index,
+                                              columns=train_user_item_matrix.columns)
+            predicted_rating = predicted_ratings_df.loc[user_id, item_id]
+        
+        elif model == 'nmf' and models['nmf'] is not None:
+            user_factors = models['nmf'].transform(train_user_item_matrix)
+            item_factors = models['nmf'].components_
+            predicted_ratings = np.dot(user_factors, item_factors)
+            predicted_ratings_df = pd.DataFrame(predicted_ratings, 
+                                              index=train_user_item_matrix.index,
+                                              columns=train_user_item_matrix.columns)
+            predicted_rating = predicted_ratings_df.loc[user_id, item_id]
+        
+        elif model == 'content' and models['content'] is not None:
+            # Content-based prediction
+            user_ratings = train_user_item_matrix.loc[user_id]
+            rated_items = user_ratings[user_ratings > 0]
+            
+            if len(rated_items) == 0:
+                predicted_rating = 2.5  # Default rating if no history
+            else:
+                # Build user profile
+                user_profile = np.zeros(models['content']['content_matrix'].shape[1])
+                total_weight = 0
+                
+                for rated_item_id, rating in rated_items.items():
+                    if rated_item_id in models['content']['movie_ids']:
+                        item_idx = models['content']['movie_ids'].index(rated_item_id)
+                        item_features = models['content']['content_matrix'][item_idx].toarray().flatten()
+                        user_profile += item_features * rating
+                        total_weight += rating
+                
+                if total_weight > 0:
+                    user_profile = user_profile / total_weight
+                
+                # Get similarity with target item
+                if item_id in models['content']['movie_ids']:
+                    item_idx = models['content']['movie_ids'].index(item_id)
+                    item_features = models['content']['content_matrix'][item_idx].toarray().flatten()
+                    similarity = cosine_similarity([user_profile], [item_features])[0][0]
+                    predicted_rating = similarity * 5  # Scale to 1-5 rating
+                else:
+                    predicted_rating = 2.5  # Default if item not in content matrix
+        
+        elif model == 'ensemble':
+            # Get predictions from multiple models and combine
+            predictions = []
+            
+            # SVD prediction
+            if models['svd'] is not None:
+                svd_pred = predict_rating(user_id, item_id, 'svd')
+                if 'predicted_rating' in svd_pred:
+                    predictions.append(svd_pred['predicted_rating'])
+            
+            # NMF prediction
+            if models['nmf'] is not None:
+                nmf_pred = predict_rating(user_id, item_id, 'nmf')
+                if 'predicted_rating' in nmf_pred:
+                    predictions.append(nmf_pred['predicted_rating'])
+            
+            # Content prediction
+            if models['content'] is not None:
+                content_pred = predict_rating(user_id, item_id, 'content')
+                if 'predicted_rating' in content_pred:
+                    predictions.append(content_pred['predicted_rating'])
+            
+            # Average the predictions
+            if predictions:
+                predicted_rating = sum(predictions) / len(predictions)
+            else:
+                predicted_rating = 2.5  # Default rating
+        
+        else:
+            return {"error": f"Model {model} not supported for prediction or not trained"}
+        
+        # Ensure rating is within valid range (1-5)
+        predicted_rating = max(1.0, min(5.0, predicted_rating))
+        
+        return {
+            'user_id': user_id,
+            'item_id': item_id,
+            'title': movie_title,
+            'predicted_rating': round(float(predicted_rating), 2),
+            'model': model
+        }
+    
+    except Exception as e:
+        print(f"Error in predict_rating: {str(e)}")
+        return {"error": f"Error predicting rating: {str(e)}"}
+
+@app.route('/')
+def home():
+    return jsonify({"message": "AI Movie Recommendation Engine API"})
+
+@app.route('/recommendations/<int:user_id>')
+def recommendations(user_id):
+    """Get recommendations for a user"""
+    n_recommendations = request.args.get('n', 10, type=int)
+    model = request.args.get('model', 'ensemble')
+    
+    result = get_user_recommendations(user_id, n_recommendations, model)
+    
+    if isinstance(result, dict) and 'error' in result:
+        return jsonify(result), 404
+    
+    return jsonify({
+        'recommendations': result,
+        'model': model,
+        'user_id': user_id
+    })
+
+@app.route('/predict')
+def predict():
+    """Predict rating for a user-item pair"""
+    user_id = request.args.get('user_id', type=int)
+    item_id = request.args.get('item_id', type=int)
+    model = request.args.get('model', 'svd')
+    
+    if user_id is None or item_id is None:
+        return jsonify({'error': 'user_id and item_id are required'}), 400
+    
+    result = predict_rating(user_id, item_id, model)
+    
+    if isinstance(result, dict) and 'error' in result:
+        return jsonify(result), 404
+    
+    return jsonify(result)
+
+@app.route('/models')
+def get_models():
+    """Get available models and their status"""
+    model_status = {}
+    for model_name, model in models.items():
+        if model_name == 'content':
+            model_status[model_name] = model is not None and 'tfidf' in model
+        else:
+            model_status[model_name] = model is not None
+    
+    return jsonify({
+        'models': model_status,
+        'available_models': ['svd', 'nmf', 'item_knn', 'user_knn', 'content', 'ensemble']
+    })
+
+@app.route('/compare/<int:user_id>')
+def compare_models(user_id):
+    """Compare recommendations from different models for a user"""
+    n_recommendations = request.args.get('n', 10, type=int)
+    
+    comparison = {}
+    model_list = ['svd', 'nmf', 'item_knn', 'user_knn', 'content', 'ensemble']
+    
+    for model in model_list:
+        result = get_user_recommendations(user_id, n_recommendations, model)
+        if isinstance(result, dict) and 'error' in result:
+            comparison[model] = {'error': result['error']}
+        else:
+            comparison[model] = result
+    
+    return jsonify({
+        'user_id': user_id,
+        'comparison': comparison,
+        'n_recommendations': n_recommendations
+    })
+
+@app.route('/movies')
+def get_movies():
+    """Get all movies"""
+    movies = [{'id': movie_id, 'title': title} for movie_id, title in movie_titles.items()]
+    return jsonify({'movies': movies})
+
+@app.route('/status')
+def status():
+    """Get system status"""
+    model_status = {}
+    for model_name, model in models.items():
+        if model_name == 'content':
+            model_status[model_name] = model is not None and 'tfidf' in model
+        else:
+            model_status[model_name] = model is not None
+    
+    return jsonify({
+        'status': 'running',
+        'models_trained': model_status,
+        'total_movies': len(movie_titles),
+        'total_users': len(user_item_matrix.index) if user_item_matrix is not None else 0,
+        'total_ratings': len(data) if data is not None else 0
+    })
+
+@app.route('/search')
+def search_movies():
+    """Search movies by title"""
+    query = request.args.get('q', '').lower()
+    sort_by = request.args.get('sort', 'title')
+    limit = request.args.get('limit', 50, type=int)
+    
+    if not query:
+        return jsonify({'error': 'Query parameter q is required'}), 400
+    
+    # Filter movies based on search query
+    matching_movies = []
+    for movie_id, title in movie_titles.items():
+        if query in title.lower():
+            matching_movies.append({
+                'id': movie_id,
+                'title': title,
+                'year': extract_year(title)
+            })
+    
+    # Sort results
+    if sort_by == 'title':
+        matching_movies.sort(key=lambda x: x['title'])
+    elif sort_by == 'id':
+        matching_movies.sort(key=lambda x: x['id'])
+    elif sort_by == 'year':
+        matching_movies.sort(key=lambda x: x['year'], reverse=True)
+    
+    # Limit results
+    matching_movies = matching_movies[:limit]
+    
+    return jsonify({
+        'movies': matching_movies,
+        'total': len(matching_movies),
+        'query': query,
+        'sort': sort_by
+    })
+
+def extract_year(title):
+    """Extract year from movie title"""
+    match = re.search(r'\((\d{4})\)', title)
+    return int(match.group(1)) if match else 0
+
+@app.route('/movies/random')
+def get_random_movies():
+    """Get random movies for browsing"""
+    limit = request.args.get('limit', 20, type=int)
+    movie_list = [{'id': movie_id, 'title': title} for movie_id, title in movie_titles.items()]
+    
+    if len(movie_list) > limit:
+        random_movies = random.sample(movie_list, limit)
+    else:
+        random_movies = movie_list
+    
+    return jsonify({
+        'movies': random_movies,
+        'total': len(random_movies)
+    })
+
+@app.route('/movies/<int:movie_id>')
+def get_movie_details(movie_id):
+    """Get details for a specific movie"""
+    if movie_id not in movie_titles:
+        return jsonify({'error': f'Movie {movie_id} not found'}), 404
+    
+    movie_title = movie_titles[movie_id]
+    
+    # Get some statistics if possible
+    movie_stats = {}
+    if data is not None:
+        movie_data = data[data['item_id'] == movie_id]
+        if not movie_data.empty:
+            movie_stats = {
+                'average_rating': round(movie_data['rating'].mean(), 2),
+                'total_ratings': len(movie_data),
+                'rating_distribution': movie_data['rating'].value_counts().to_dict()
+            }
+    
+    return jsonify({
+        'id': movie_id,
+        'title': movie_title,
+        'year': extract_year(movie_title),
+        'stats': movie_stats
+    })
+
+if __name__ == '__main__':
+    print("Starting AI Movie Recommendation Engine...")
+    
+    try:
+        load_and_train_model()
+        print("Server is ready!")
+    except Exception as e:
+        print(f"Error during startup: {e}")
+        print("Server will start but some features may not work.")
+    
+    app.run(debug=True, host='0.0.0.0', port=5000)
