@@ -15,13 +15,13 @@ class PythonAnywhereConfig:
     
     # Database configuration - PythonAnywhere uses SQLite by default
     DATABASE_TYPE = 'sqlite'
-    DATABASE_PATH = '/home/yourusername/mysite/ratings.db'  # Update with your username
+    DATABASE_PATH = '/home/fizu/AI-Movie-Recommender/ratings.db'  # Updated with your username
     
     # MySQL configuration (for paid PythonAnywhere plans)
-    MYSQL_HOST = os.getenv('MYSQL_HOST', 'yourusername.mysql.pythonanywhere-services.com')
-    MYSQL_USER = os.getenv('MYSQL_USER', 'yourusername')
+    MYSQL_HOST = os.getenv('MYSQL_HOST', 'fizu.mysql.pythonanywhere-services.com')
+    MYSQL_USER = os.getenv('MYSQL_USER', 'fizu')
     MYSQL_PASSWORD = os.getenv('MYSQL_PASSWORD', '')
-    MYSQL_DATABASE = os.getenv('MYSQL_DATABASE', 'yourusername$movierecommendations')
+    MYSQL_DATABASE = os.getenv('MYSQL_DATABASE', 'fizu$movierecommendations')
     
     # Cache configuration - Simple in-memory cache for PythonAnywhere
     CACHE_TYPE = 'simple'
@@ -33,7 +33,7 @@ class PythonAnywhereConfig:
     TMDB_IMAGE_BASE_URL = 'https://image.tmdb.org/t/p'
     
     # Firebase configuration
-    FIREBASE_SERVICE_ACCOUNT_PATH = '/home/yourusername/mysite/firebase-service-account.json'
+    FIREBASE_SERVICE_ACCOUNT_PATH = '/home/fizu/AI-Movie-Recommender/firebase-service-account.json'
     
     # Machine Learning configuration - Optimized for PythonAnywhere
     ML_MODEL_CACHE_TIMEOUT = 1800  # 30 minutes (shorter for memory constraints)
@@ -41,7 +41,7 @@ class PythonAnywhereConfig:
     
     # PythonAnywhere-specific settings
     MAX_CONTENT_LENGTH = 1048576  # 1MB (smaller for PythonAnywhere)
-    PYTHONANYWHERE_DOMAIN = os.getenv('PYTHONANYWHERE_DOMAIN', 'yourusername.pythonanywhere.com')
+    PYTHONANYWHERE_DOMAIN = os.getenv('PYTHONANYWHERE_DOMAIN', 'fizu.pythonanywhere.com')
     
     # CORS configuration for PythonAnywhere
     CORS_ORIGINS = [
@@ -54,7 +54,7 @@ class PythonAnywhereConfig:
     # Logging configuration
     LOG_LEVEL = 'INFO'
     LOG_FORMAT = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-    LOG_FILE = '/home/yourusername/mysite/logs/app.log'
+    LOG_FILE = '/home/fizu/AI-Movie-Recommender/logs/app.log'
     
     # Performance settings for PythonAnywhere
     ENABLE_THREADING = True
@@ -81,8 +81,8 @@ class PythonAnywhereConfig:
         
         # Check required files
         required_files = [
-            '/home/yourusername/mysite/app_pythonanywhere.py',
-            '/home/yourusername/mysite/wsgi.py'
+            '/home/fizu/AI-Movie-Recommender/app_pythonanywhere.py',
+            '/home/fizu/AI-Movie-Recommender/wsgi.py'
         ]
         
         for file_path in required_files:

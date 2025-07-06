@@ -7,8 +7,8 @@ import sys
 import os
 
 # Add your project directory to Python path
-# Replace 'yourusername' with your actual PythonAnywhere username
-path = '/home/yourusername/mysite'  # Update this path
+# Replace 'fizu' with your actual PythonAnywhere username if different
+path = '/home/fizu/AI-Movie-Recommender'
 if path not in sys.path:
     sys.path.insert(0, path)
 
