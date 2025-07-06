@@ -62,8 +62,8 @@ A production-ready web application that provides personalized movie recommendati
 
 ### 1. Clone the Repository
 ```bash
-git clone https://github.com/yourusername/ai-movie-recommendation-engine.git
-cd ai-movie-recommendation-engine
+git clone https://github.com/faizanshoukat5/AI-Movie-Recommender.git
+cd AI-Movie-Recommender
 ```
 
 ### 2. Backend Setup
@@ -167,7 +167,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 For support and questions:
 - 📧 Email: [your-email@example.com]
-- 🐛 Issues: [GitHub Issues](https://github.com/yourusername/ai-movie-recommendation-engine/issues)
+- 🐛 Issues: [GitHub Issues](https://github.com/faizanshoukat5/AI-Movie-Recommender/issues)
 - 📖 Documentation: Check the docs folder
 
 ---

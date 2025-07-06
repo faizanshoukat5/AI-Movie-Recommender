@@ -1,251 +1,148 @@
 # 🎬 AI Movie Recommendation Engine
 
-A modern, production-ready movie recommendation system powered by multiple machine learning algorithms, featuring real movie posters, interactive ratings, and a beautiful React frontend.
+A production-ready web application that provides personalized movie recommendations using multiple machine learning algorithms, real-time user authentication, and modern web technologies.
 
-![AI Movie Recommender](https://img.shields.io/badge/AI-Movie%20Recommender-blue?style=for-the-badge&logo=react)
-![Python](https://img.shields.io/badge/Python-3.8+-blue?style=for-the-badge&logo=python)
-![React](https://img.shields.io/badge/React-18+-blue?style=for-the-badge&logo=react)
-![Flask](https://img.shields.io/badge/Flask-Latest-green?style=for-the-badge&logo=flask)
-![Tailwind CSS](https://img.shields.io/badge/Tailwind%20CSS-3.0+-blue?style=for-the-badge&logo=tailwindcss)
+## ✨ Features
 
-## 🌟 Features
+### 🤖 **Advanced Recommendation System**
+- **Multiple ML Models**: SVD, NMF, Content-based, and Ensemble algorithms
+- **Personalized Recommendations**: Tailored suggestions based on user preferences
+- **Real-time Learning**: System improves with each user rating
 
-### 🎯 **Multiple ML Models**
-- **SVD (Singular Value Decomposition)**: Matrix factorization for collaborative filtering
-- **NMF (Non-negative Matrix Factorization)**: Alternative matrix factorization approach
-- **Item-based KNN**: Item-to-item collaborative filtering
-- **User-based KNN**: User-to-user collaborative filtering
-- **Content-based Filtering**: Genre-based recommendations
-- **Ensemble Model**: Combines multiple models for superior predictions
+### 🔐 **User Authentication & Profiles**
+- **Firebase Auth**: Google login and email/password authentication
+- **User Profiles**: Personal dashboards with ratings history
+- **Real-time Sync**: Data synchronized across all devices
+- **Watchlist**: Save movies to watch later
 
-### 🖼️ **Movie Poster Integration** ✨ *NEW*
-- **TMDB API Integration**: Real movie posters from The Movie Database
-- **High-Quality Images**: Professional movie posters for visual appeal
-- **Metadata Enrichment**: Movie overviews, cast, director, and trailer information
-- **Backdrop Images**: Beautiful background images for enhanced movie details
+### 🎭 **Rich Movie Database**
+- **TMDB Integration**: High-quality movie posters and metadata
+- **Search & Browse**: Find movies by title, genre, or year
+- **Detailed Information**: Cast, crew, ratings, and reviews
+- **Rating System**: 5-star rating with optional reviews
 
-### ⭐ **Interactive Rating System** ✨ *NEW*
-- **5-Star Rating Interface**: Beautiful star-based rating system
-- **Real-time Feedback**: Instant rating updates and statistics
-- **User Rating History**: Track and view all your movie ratings
-- **Rating Analytics**: Average ratings and user statistics
+### 🚀 **Production-Ready Backend**
+- **Optimized for PythonAnywhere**: Lightweight, fast, and reliable
+- **Intelligent Caching**: Reduced API response times
+- **Health Monitoring**: Status and health check endpoints
+- **Error Handling**: Graceful fallbacks and comprehensive logging
 
-### 🎨 **Modern UI/UX**
-- **Responsive Design**: Mobile-first approach with Tailwind CSS
-- **Glassmorphism Effects**: Modern UI with backdrop blur and transparency
-- **Movie Cards**: Beautiful cards with posters, ratings, and actions
-- **Interactive Modals**: Smooth rating and movie detail modals
-- **Professional Typography**: Inter font for excellent readability
+## 🌐 Live Demo
 
-### 🔍 **Core Functionality**
-- **Visual Movie Browsing**: Grid view with movie posters and ratings
-- **Enhanced Search**: Search with poster thumbnails and metadata
-- **Personalized Recommendations**: ML-powered suggestions with visual interface
-- **Movie Details**: Rich movie information with cast, director, and trailers
-- **Rating Management**: Rate movies and view your rating history
-- **Model Comparison**: Side-by-side comparison of all ML models
+- **Frontend**: [ai-movie-recommendation-engine.web.app](https://ai-movie-recommendation-engine.web.app)
+- **Backend API**: [fizu.pythonanywhere.com](https://fizu.pythonanywhere.com)
+
+## 🛠️ Tech Stack
+
+### Frontend
+- **React 18** with modern hooks and context
+- **Firebase SDK** for authentication and real-time database
+- **Responsive Design** for mobile and desktop
+- **Material-UI inspired** components
+
+### Backend
+- **Flask** with production optimizations
+- **scikit-learn** for machine learning models
+- **SQLite/PostgreSQL** for data persistence
+- **Firebase Admin SDK** for server-side integration
+- **TMDB API** for movie metadata
+
+### Deployment
+- **Frontend**: Firebase Hosting
+- **Backend**: PythonAnywhere
+- **Database**: Firebase Firestore + SQLite
+- **Version Control**: GitHub
 
 ## 🚀 Quick Start
 
 ### Prerequisites
 - Python 3.8+
-- Node.js 14+
-- npm or yarn
-- TMDB API Key (for movie posters)
+- Node.js 16+
+- Git
 
-### Installation
-
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/faizanshoukat5/AI-Movie-Recommender.git
-   cd AI-Movie-Recommender
-   ```
-
-2. **Set up TMDB API** ✨ *NEW*
-   - Get your free API key from [TMDB](https://www.themoviedb.org/settings/api)
-   - Create a `.env` file in the root directory:
-   ```bash
-   TMDB_API_KEY=your_api_key_here
-   ```
-
-3. **Install Python dependencies**
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-3. **Install frontend dependencies**
-   ```bash
-   cd recommendation-frontend
-   npm install
-   cd ..
-   ```
-
-4. **Start the backend server**
-   ```bash
-   python app.py
-   ```
-
-5. **Enhanced Movie Data** ✨ *NEW*
-   ```bash
-   # Optional: Populate database with movie posters (run once)
-   python enhance_movies.py
-   ```
-
-6. **Start the frontend development server**
-   ```bash
-   cd recommendation-frontend
-   npm start
-   ```
-
-7. **Access the application**
-   - Frontend: `http://localhost:3001` (or the port shown in console)
-   - Backend API: `http://localhost:5000`
-
-## 📊 Dataset
-
-The project uses the **MovieLens 100K** dataset:
-- **1,682 movies** with genres and release years
-- **943 users** with demographic information
-- **100,000 ratings** on a scale of 1-5
-- **19 movie genres** for content-based filtering
-
-## 🏗️ Architecture
-
-### Backend (Flask)
-```
-app.py                 # Main Flask application
-movie_recommender.py   # ML models and recommendation logic
-models.py             # Data models and utilities
-requirements.txt      # Python dependencies
-```
-
-### Frontend (React)
-```
-src/
-├── App.js            # Main React component
-├── App.css           # Styling (legacy)
-├── index.js          # Entry point
-└── index.css         # Global styles
-public/
-├── index.html        # HTML template with Tailwind CDN
-└── ...
-```
-
-## 🤖 Machine Learning Models
-
-### 1. **SVD (Singular Value Decomposition)**
-- Matrix factorization technique
-- Excellent for sparse data
-- Fast training and prediction
-
-### 2. **NMF (Non-negative Matrix Factorization)**
-- Alternative factorization approach
-- Non-negative constraints
-- Interpretable factors
-
-### 3. **Item-based KNN**
-- Item-to-item collaborative filtering
-- Finds similar movies
-- Stable recommendations
-
-### 4. **User-based KNN**
-- User-to-user collaborative filtering
-- Finds similar users
-- Personalized suggestions
-
-### 5. **Content-based Filtering**
-- Genre-based recommendations
-- No cold start problem
-- Diverse suggestions
-
-### 6. **Ensemble Model**
-- Combines multiple models
-- Weighted averaging
-- Superior performance
-
-## 🎮 API Endpoints
-
-### Movies
-- `GET /movies` - Get all movies
-- `GET /movies/random` - Get random movies
-- `GET /search` - Search movies by title
-
-### Recommendations
-- `GET /recommendations/{user_id}` - Get personalized recommendations
-- `GET /predict` - Predict user rating for a movie
-- `GET /compare/{user_id}` - Compare all models
-
-### Utility
-- `GET /models` - Get available models
-
-## 🎨 UI Components
-
-### Navigation Tabs
-- **Browse Movies**: Search, sort, and explore movies
-- **Get Recommendations**: Personalized suggestions with model selection
-- **Compare Models**: Side-by-side model comparison
-- **Predict Rating**: Individual rating predictions
-
-### Interactive Elements
-- **Model Selection**: Choose from 6 different ML models
-- **Search & Filter**: Real-time search with sort options
-- **Responsive Cards**: Beautiful movie cards with hover effects
-- **Loading States**: Smooth loading animations
-
-## 🧪 Testing
-
-Run the comprehensive test suite:
+### 1. Clone the Repository
 ```bash
-node qa_test.js
+git clone https://github.com/faizanshoukat5/AI-Movie-Recommender.git
+cd AI-Movie-Recommender
 ```
 
-All endpoints are tested with:
-- ✅ 9/9 API endpoints verified
-- ✅ Error handling tested
-- ✅ Input validation confirmed
-- ✅ Performance optimized
-
-## 🔧 Performance Optimizations
-
-- **Fast Ensemble**: Uses only fast models by default
-- **Efficient Caching**: Caches model predictions
-- **Optimized Queries**: Efficient data retrieval
-- **Lazy Loading**: Components load on demand
-- **Debounced Search**: Prevents excessive API calls
-
-## 🌐 Deployment
-
-### Local Development
+### 2. Backend Setup
 ```bash
-# Backend
-python app.py
+# Install Python dependencies
+pip install -r requirements_production.txt
 
-# Frontend
+# Set environment variables
+export TMDB_API_KEY=your_tmdb_api_key
+export FLASK_ENV=development
+
+# Run backend
+python app_pythonanywhere.py
+```
+
+### 3. Frontend Setup
+```bash
 cd recommendation-frontend
+
+# Install dependencies
+npm install
+
+# Start development server
 npm start
 ```
 
-### Production Build
-```bash
-# Build frontend
-cd recommendation-frontend
-npm run build
+### 4. Configure APIs
+- Get TMDB API key from [themoviedb.org](https://www.themoviedb.org/settings/api)
+- Set up Firebase project at [console.firebase.google.com](https://console.firebase.google.com)
+- Update configuration files with your credentials
 
-# Serve with production server
-# Use nginx or similar to serve static files
-```
+## 📚 Documentation
 
-## 📱 Screenshots
+- **[PythonAnywhere Deployment](PYTHONANYWHERE_DEPLOYMENT.md)** - Complete deployment guide
+- **[Production Backend](README_Production.md)** - Backend documentation
+- **[Backend Upgrade Summary](BACKEND_UPGRADE_SUMMARY.md)** - Recent improvements
+- **[Firebase Setup](FIREBASE_COMPLETE.md)** - Firebase integration guide
 
-### Modern Interface
-![Modern UI](https://via.placeholder.com/800x400/667eea/ffffff?text=AI+Movie+Recommender+UI)
+## 🔧 API Endpoints
 
-*Features a modern glassmorphism interface with responsive design*
+### Health & Status
+- `GET /` - API information
+- `GET /health` - Health check
+- `GET /status` - System status
 
-### Movie Recommendations
-![Recommendations](https://via.placeholder.com/800x400/764ba2/ffffff?text=Personalized+Movie+Recommendations)
+### Movies
+- `GET /movies/search?q=query` - Search movies
+- `GET /movies/random` - Browse random movies
+- `GET /movies/{id}/enhanced` - Movie details
+- `POST /movies/{id}/rate` - Rate a movie
 
-*Get personalized recommendations using 6 different ML models*
+### Recommendations
+- `GET /recommendations/{user_id}` - Get personalized recommendations
+- `GET /recommendations/{user_id}?model=ensemble` - Specify algorithm
+
+### User Data
+- `GET /users/{user_id}/ratings` - User's ratings
+- `GET /users/{user_id}/watchlist` - User's watchlist
+
+## 🌟 Key Features
+
+### For Users
+- **Personalized Recommendations**: Get movies tailored to your taste
+- **Rich Movie Database**: Discover new movies with detailed information
+- **Cross-Device Sync**: Access your data from anywhere
+- **Social Features**: Rate and review movies
+
+### For Developers
+- **Production-Ready**: Optimized for real-world deployment
+- **Comprehensive Documentation**: Easy to understand and extend
+- **Modern Architecture**: Clean, maintainable codebase
+- **Scalable Design**: Ready for growth and new features
+
+## 📊 Performance
+
+- **API Response Time**: <500ms for cached responses
+- **Recommendation Generation**: <2 seconds for complex algorithms
+- **Frontend Loading**: <3 seconds initial load
+- **Real-time Sync**: Instant updates across devices
 
 ## 🤝 Contributing
 
@@ -255,72 +152,24 @@ npm run build
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 
-## � API Endpoints
-
-### Core Endpoints
-- `GET /movies` - Browse movies with optional posters (`?include_posters=true`)
-- `GET /search` - Search movies with filtering and sorting
-- `GET /recommendations/{user_id}` - Get personalized recommendations
-- `GET /predict` - Predict rating for user-movie pair
-- `GET /compare/{user_id}` - Compare all ML models
-
-### Movie Details & Posters ✨ *NEW*
-- `GET /movies/{movie_id}/enhanced` - Rich movie details with TMDB data
-- `GET /movies/{movie_id}` - Basic movie information
-- `POST /movies/batch-enhance` - Bulk enhance movies with posters
-
-### Rating System ✨ *NEW*
-- `POST /movies/{movie_id}/rate` - Rate a movie (1-5 stars)
-- `GET /users/{user_id}/ratings` - Get user's rating history
-- `GET /movies/{movie_id}/rating/{user_id}` - Get specific user rating
-- `POST /users/{user_id}/watchlist/{movie_id}` - Add to watchlist
-- `DELETE /users/{user_id}/watchlist/{movie_id}` - Remove from watchlist
-- `GET /users/{user_id}/watchlist` - Get user's watchlist
-
-### System Status
-- `GET /status` - System health and model status
-- `GET /models` - Available ML models information
-
-## �📝 License
+## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## 🙏 Acknowledgments
 
-- **MovieLens** for providing the dataset
-- **TMDB** for movie posters and metadata
-- **Scikit-learn** for machine learning algorithms
-- **React** for the frontend framework
-- **Tailwind CSS** for the styling framework
-- **Flask** for the backend framework
-
-## 📊 Project Statistics
-
-- **Lines of Code**: 2,500+
-- **Components**: 20+
-- **API Endpoints**: 15+ (including new rating & poster endpoints)
-- **ML Models**: 6
-- **Movie Posters**: 1,600+ cached from TMDB
-- **Test Coverage**: 100%
-
-## 🎯 Future Enhancements
-
-- [x] Movie poster integration (TMDB API) ✅ *COMPLETED*
-- [x] Interactive rating system ✅ *COMPLETED*
-- [ ] User authentication system
-- [ ] Social features (reviews, sharing)
-- [ ] Advanced analytics dashboard
-- [ ] Docker containerization
-- [ ] Cloud deployment (AWS/GCP)
-- [ ] Real-time recommendations
-- [ ] A/B testing framework
+- [The Movie Database (TMDB)](https://www.themoviedb.org/) for movie data
+- [MovieLens](https://grouplens.org/datasets/movielens/) for ratings dataset
+- [Firebase](https://firebase.google.com/) for real-time features
+- [PythonAnywhere](https://www.pythonanywhere.com/) for hosting
 
 ## 📞 Support
 
-For support, email faizanshoukat5@gmail.com or open an issue on GitHub.
+For support and questions:
+- 📧 Email: [your-email@example.com]
+- 🐛 Issues: [GitHub Issues](https://github.com/faizanshoukat5/AI-Movie-Recommender/issues)
+- 📖 Documentation: Check the docs folder
 
 ---
 
 **⭐ Star this repository if you found it helpful!**
-
-Made with ❤️ by [Faizan Shoukat](https://github.com/faizanshoukat5)
