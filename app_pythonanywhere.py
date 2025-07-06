@@ -420,10 +420,10 @@ def recommendations(user_id):
 @app.route('/movies/search')
 @simple_cache(timeout=300)
 def search_movies():
-    """Search movies with caching"""
+    """Search movies with enhanced metadata"""
     query = request.args.get('q', '').lower()
     limit = request.args.get('limit', 50, type=int)
-    include_posters = request.args.get('include_posters', 'false').lower() == 'true'
+    include_posters = request.args.get('include_posters', 'true').lower() == 'true'
     
     if not query:
         return jsonify({'error': 'Query parameter q is required'}), 400
@@ -436,16 +436,61 @@ def search_movies():
                 'id': movie_id,
                 'title': title,
                 'year': extract_year(title),
-                'genres': movie_genres.get(movie_id, [])
+                'genres': movie_genres.get(movie_id, []),
+                # Add required fields with defaults
+                'overview': f"Classic movie from the MovieLens dataset: {title}",
+                'poster_path': None,
+                'backdrop_path': None,
+                'release_date': None,
+                'vote_average': 0.0,
+                'vote_count': 0
             }
             
-            # Add poster if requested and available
-            if include_posters and tmdb_client and rating_db:
+            # Try to get enhanced metadata
+            if tmdb_client and rating_db:
                 try:
+                    # Check if we have cached metadata
                     cached_metadata = rating_db.get_movie_metadata(movie_id)
-                    if cached_metadata and cached_metadata.get('poster_path'):
-                        movie_info['poster_url'] = tmdb_client.get_poster_url(cached_metadata['poster_path'])
-                except:
+                    if cached_metadata:
+                        movie_info.update({
+                            'overview': cached_metadata.get('overview', movie_info['overview']),
+                            'poster_path': cached_metadata.get('poster_path'),
+                            'backdrop_path': cached_metadata.get('backdrop_path'),
+                            'release_date': cached_metadata.get('release_date'),
+                            'vote_average': cached_metadata.get('vote_average', 0.0),
+                            'vote_count': cached_metadata.get('vote_count', 0)
+                        })
+                        
+                        # Add poster URL if available
+                        if include_posters and cached_metadata.get('poster_path'):
+                            movie_info['poster_url'] = tmdb_client.get_poster_url(cached_metadata['poster_path'])
+                    else:
+                        # Try to fetch from TMDB (limited to avoid rate limits)
+                        if tmdb_client and len(matching_movies) < 5:  # Only fetch for first few movies
+                            search_results = tmdb_client.search_movie(title)
+                            if search_results and search_results.get('results'):
+                                tmdb_movie = search_results['results'][0]
+                                
+                                # Update movie info with TMDB data
+                                movie_info.update({
+                                    'overview': tmdb_movie.get('overview', movie_info['overview']),
+                                    'poster_path': tmdb_movie.get('poster_path'),
+                                    'backdrop_path': tmdb_movie.get('backdrop_path'),
+                                    'release_date': tmdb_movie.get('release_date'),
+                                    'vote_average': tmdb_movie.get('vote_average', 0.0),
+                                    'vote_count': tmdb_movie.get('vote_count', 0)
+                                })
+                                
+                                # Cache the metadata
+                                rating_db.cache_movie_metadata(movie_id, tmdb_movie)
+                                
+                                # Add poster URL if available
+                                if include_posters and tmdb_movie.get('poster_path'):
+                                    movie_info['poster_url'] = tmdb_client.get_poster_url(tmdb_movie['poster_path'])
+                                    
+                except Exception as e:
+                    logger.error(f"Error fetching movie metadata for {movie_id}: {e}")
+                    # Keep default values
                     pass
             
             # Add ratings if available
@@ -455,7 +500,8 @@ def search_movies():
                     if avg_rating > 0:
                         movie_info['user_rating'] = round(avg_rating, 2)
                         movie_info['user_rating_count'] = rating_count
-                except:
+                except Exception as e:
+                    logger.error(f"Error fetching ratings for {movie_id}: {e}")
                     pass
             
             matching_movies.append(movie_info)
@@ -545,12 +591,19 @@ def rate_movie(movie_id):
         return jsonify({'error': 'Rating system not available'}), 503
     
     try:
+        # Initialize database if needed
+        if hasattr(rating_db, 'initialize_db'):
+            rating_db.initialize_db()
+        
         # Save the rating
         success = rating_db.add_rating(user_id, movie_id, rating)
         
         if success:
             # Get updated statistics
-            avg_rating, rating_count = rating_db.get_average_rating(movie_id)
+            try:
+                avg_rating, rating_count = rating_db.get_average_rating(movie_id)
+            except:
+                avg_rating, rating_count = rating, 1
             
             # Clear cache
             _cache.clear()
@@ -570,7 +623,7 @@ def rate_movie(movie_id):
             
     except Exception as e:
         logger.error(f"Error in rate_movie: {e}")
-        return jsonify({'error': 'Internal server error'}), 500
+        return jsonify({'error': f'Internal server error: {str(e)}'}), 500
 
 @app.route('/movies/<int:movie_id>/enhanced')
 @simple_cache(timeout=1800)
