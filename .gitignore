@@ -90,3 +90,33 @@ firebase-debug.log
 # API keys (keep example files)
 firebase-service-account.json
 !firebase-service-account.json.example
+
+# === Project Backups, Previous Versions, and Unused Files ===
+# Root-level backup and previous versions
+app_current_backup.py
+app_original.py
+requirements_current_backup.txt
+requirements_original.txt
+README_new.md
+README_original.md
+README_v2.md
+switch_to_original.bat
+
+# QA and upload logs
+FINAL_QA_SUMMARY.md
+GITHUB_UPLOAD_SUCCESS.md
+
+# Frontend/src backup, previous, and unused files
+recommendation-frontend/src/App.css.backup
+recommendation-frontend/src/App_current_backup.css
+recommendation-frontend/src/App_current_backup.js
+recommendation-frontend/src/App_enhanced.css
+recommendation-frontend/src/App_enhanced.js
+recommendation-frontend/src/App_firebase.js
+recommendation-frontend/src/App_new.css
+recommendation-frontend/src/App_original.css
+recommendation-frontend/src/App_original.js
+recommendation-frontend/src/App_tailwind.js
+recommendation-frontend/src/index_current_backup.js
+recommendation-frontend/src/index_firebase.js
+recommendation-frontend/src/index_original.js
