@@ -333,13 +333,28 @@ def get_user_ratings(user_id):
             formatted_ratings.append({
                 'movie_id': movie_id,
                 'rating': rating,
-                'movie': movie
+                'movie': movie,
+                'timestamp': '2025-07-07T12:00:00Z'  # Default timestamp
             })
     
     return jsonify({
         'user_id': user_id,
         'ratings': formatted_ratings,
         'total': len(formatted_ratings)
+    })
+
+@app.route('/models')
+def get_models():
+    """Get available models endpoint"""
+    return jsonify({
+        'available_models': ['Popular', 'SVD', 'NMF', 'Content-Based'],
+        'default_model': 'Popular',
+        'models_info': {
+            'Popular': 'Popularity-based recommendations',
+            'SVD': 'Singular Value Decomposition',
+            'NMF': 'Non-negative Matrix Factorization', 
+            'Content-Based': 'Content similarity recommendations'
+        }
     })
 
 # This is what PythonAnywhere will use
